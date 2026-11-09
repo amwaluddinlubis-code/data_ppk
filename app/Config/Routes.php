@@ -26,6 +26,23 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->post('pengguna/(:num)/aktif', 'Auth::alihAktif/$1');
     $routes->post('pengguna/(:num)/reset-sandi', 'Auth::resetSandi/$1');
 
+    // Kelola Data Coklit — CRUD (Fase 2; Admin & Operator, diperiksa di controller)
+    $routes->get('coklit', 'Coklit::index');
+    $routes->get('coklit/tambah', 'Coklit::tambah');
+    $routes->post('coklit/simpan', 'Coklit::simpan');
+    $routes->get('coklit/edit/(:segment)', 'Coklit::edit/$1');
+    $routes->post('coklit/update/(:segment)', 'Coklit::update/$1');
+    $routes->post('coklit/hapus/(:segment)', 'Coklit::hapus/$1');
+
+    // Riwayat Perubahan (Fase 2)
+    $routes->get('riwayat', 'Riwayat::index');
+    $routes->post('riwayat/pulih/(:num)', 'Riwayat::pulih/$1');
+
+    // Impor data (Fase 3; Admin & Operator kecamatan, diperiksa di controller)
+    $routes->get('impor', 'Impor::index');
+    $routes->post('impor/mhc', 'Impor::prosesMhc');
+    $routes->post('impor/tms8', 'Impor::prosesTms8');
+
     // Beranda: Daftar Hasil Coklit Pantarlih
     $routes->get('/', 'Dashboard::index');
     $routes->post('dashboard/getPemilih', 'Dashboard::getPemilih');
@@ -47,6 +64,19 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->post('pemilih/aktif', 'Pemilih::aktif');
     $routes->get('pemilih/ms', 'Pemilih::ms');
     $routes->post('pemilih/ms', 'Pemilih::ms');
+    $routes->get('pemilih/ms-pdf', 'Pemilih::msPdf');
+
+    // Laporan ringkasan per desa / TPS (Fase 4)
+    $routes->get('laporan', 'Laporan::index');
+
+    // Keamanan data (Fase 5; Admin PPK, diperiksa lagi di controller)
+    $routes->get('log-akses', 'LogAkses::index');
+    $routes->get('backup', 'Backup::index');
+    $routes->post('backup/buat', 'Backup::buat');
+
+    // Multi-kecamatan (Fase 6; Admin PPK, diperiksa lagi di controller)
+    $routes->get('kecamatan', 'Kecamatan::index');
+    $routes->post('kecamatan/aktifkan/(:segment)', 'Kecamatan::aktifkan/$1');
 
     // NIK Ganda
     $routes->get('residu', 'Residu::index');

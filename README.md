@@ -84,12 +84,10 @@ Lalu pilih salah satu sumber basis data:
    `admin123`, wajib ganti sandi saat pertama masuk).
    Data coklit (`mhc`, `tms8`, dll.) diimpor terpisah.
 2. **Dari dump yang ada**: impor `db_pemilih.sql` seperti biasa,
-   lalu jalankan **hanya** migration tabel pengguna:
-   `php spark migrate` tidak bisa dipakai apa adanya (migration baseline
-   akan gagal karena tabel sudah ada) — buat tabel `users` dari
-   `app/Database/Migrations/2026-11-09-110000_TabelUsers.php` secara
-   manual, atau jalankan migrate pada basis data kosong lalu impor
-   datanya. Sesudah tabel ada, `php spark db:seed PenggunaAwalSeeder`.
+   lalu `php spark migrate` — migration baseline bersifat toleran
+   (objek yang sudah ada dilewati), jadi aman di basis data hasil
+   impor maupun basis data kosong. Sesudah itu
+   `php spark db:seed PenggunaAwalSeeder` (bila akun awal belum ada).
 
 Jalankan dengan web server menunjuk ke folder `public/`, atau
 `php spark serve`. Sesuai konfigurasi contoh, aplikasi tampil di
@@ -116,7 +114,80 @@ npx tailwindcss -i input.css -o ../../public/assets/css/app.css --minify
 | `/pemilih/tersaring` | Pemilih Tersaring/TMS (view `tersaring`) |
 | `/pemilih/aktifPrint` | Pemilih Aktif/MS (view `pemilih_active`) |
 | `/pemilih/ms?desa=..&tps=..` | Cetak daftar MS (HTML siap cetak) |
+| `/pemilih/ms-pdf?desa=..&tps=..` | Daftar MS sebagai PDF (Fase 4) |
 | `/residu` | NIK Ganda (view `analisis_nik_ganda`) |
+| `/coklit` | Kelola Data Coklit — CRUD (Fase 2, Admin & Operator) |
+| `/riwayat` | Riwayat Perubahan + pemulihan baris (Fase 2) |
+| `/impor` | Impor CSV/Excel coklit & keterangan tms8 (Fase 3) |
+| `/laporan` | Laporan ringkasan per desa / TPS (Fase 4) |
+| `/log-akses` | Log akses data sensitif (Fase 5, hanya Admin) |
+| `/backup` | Cadangan basis data .sql (Fase 5, hanya Admin) |
+| `/kecamatan` | Ganti kecamatan aktif (Fase 6, hanya Admin) |
 
 Pengembangan lanjutan mengikuti `Kerangka_Pengembangan_App_Pemilih.md`
 (Fase 1: login & peran; Fase 2: CRUD; dst.).
+
+## Status Fase 2 (9 November 2026) — CRUD data coklit & jejak audit
+
+- **Kelola Data Coklit** (`/coklit`, Admin & Operator): cari (NIK/NAMA/NKK),
+  tambah, ubah, hapus baris `mhc` lewat formulir. Karena daftar aktif/MS
+  adalah VIEW di atas `mhc`, koreksi langsung tercermin di semua halaman.
+- **Validasi**: NIK & NKK tepat 16 angka; NIK tidak boleh ganda di daftar
+  aktif (kelompok KET 0/U/B); desa/TPS/KET/jenis kelamin diperiksa.
+- **Cakupan desa**: operator yang kolom `desa`-nya terisi (mis. PPS) hanya
+  melihat & mengubah baris desanya sendiri.
+- **Riwayat Perubahan** (`/riwayat`): setiap tambah/ubah/hapus tercatat
+  beserta salinan baris sebelum & sesudah (JSON) dan pelakunya.
+  Baris terhapus dapat **dipulihkan** oleh Admin dari halaman ini —
+  penghapusan di `mhc` permanen, tetapi salinannya tidak hilang.
+
+## Status Fase 3 (9 November 2026) — Impor CSV/Excel
+
+- **Impor Data** (`/impor`, Admin & Operator kecamatan): berkas CSV/XLSX/XLS
+  dengan baris judul = nama kolom `mhc` (wajib: NIK, NAMA, DESA, TPS, KET).
+  - Mode **TAMBAH**: baris baru disisipkan; UID yang sudah ada dilewati.
+  - Mode **GANTI SEMUA**: data lama dicadangkan otomatis ke
+    `writable/backup/mhc-sebelum-impor-*.csv`, lalu `mhc` dikosongkan
+    dan diisi dari berkas.
+  - Sesudah impor tampil **rekonsiliasi** (total coklit, MS, baru,
+    tersaring, pindah TPS, jumlah KK) — tidak ada lagi langkah analisis
+    manual karena semua daftar adalah view atas `mhc`.
+- **Impor keterangan `tms8`**: kolom NIK + STATUS; memperbarui yang ada,
+  menambah yang belum ada. Semua impor tercatat di tabel `impor_log`
+  dan di Riwayat Perubahan.
+
+## Status Fase 4 (9 November 2026) — Cetak & laporan
+
+- **Daftar MS sebagai PDF**: `/pemilih/ms-pdf?desa=..&tps=..` (dompdf,
+  A4 landscape) dari tampilan cetak yang sama dengan versi HTML;
+  tombol **PDF** tersedia di halaman Pemilih Aktif dan Laporan.
+- **Laporan Ringkasan** (`/laporan`, semua peran): tabel per desa
+  (TPS, total coklit, MS, KK, baru, tersaring, pindah TPS) + rincian
+  per TPS untuk desa terpilih + tombol cetak halaman.
+
+## Status Fase 5 (9 November 2026) — Keamanan data pribadi
+
+- **Penyamaran NIK/NKK untuk Pemeriksa**: peran `viewer` menerima NIK &
+  NKK tersamar (`1213********0008`) di semua tabel data. (Daftar cetak
+  MS memang hanya menampilkan NKK ter-encode sejak awal.)
+- **Log Akses** (`/log-akses`, Admin): masuk, masuk gagal, keluar,
+  cetak daftar MS, unduh PDF, pembuatan cadangan, ganti kecamatan.
+- **Cadangan Basis Data** (`/backup`, Admin): unduh dump `.sql` lengkap
+  (struktur + data + view) dari basis data kecamatan aktif; berkas juga
+  tersimpan di `writable/backup/`. Berisi data pribadi — simpan aman.
+- **CSRF**: semua POST (formulir & DataTables AJAX) wajib token;
+  token per sesi stabil (tidak di-regenerasi tiap permintaan).
+
+## Status Fase 6 (9 November 2026) — Multi-kecamatan
+
+- Satu pemasangan melayani banyak kecamatan: daftar kecamatan & nama
+  basis datanya di `app/Config/Kecamatan.php` (grup koneksi dibuat
+  otomatis meniru koneksi utama). Kecamatan contoh (Sinunukan, Batang
+  Natal, PSM, MBG, Pansel, LSM, Batahan) tersedia nonaktif — sesuaikan
+  nama basis data lalu set `aktif => true`.
+- Admin mengganti kecamatan aktif di menu **Kecamatan** (`/kecamatan`);
+  pilihan tersimpan per sesi dan semua halaman mengikuti basis data itu.
+  Basis data kecamatan baru: buat DB kosong →
+  `php spark migrate -g <grup>` → impor datanya lewat menu Impor.
+- **Pengguna & log akses selalu dari basis data utama** (`users` dikunci
+  ke grup `default`), jadi satu akun berlaku untuk semua kecamatan.

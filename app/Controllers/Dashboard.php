@@ -42,8 +42,9 @@ class Dashboard extends BaseController
 
         // if ($ket != '') $builder->where('kET', $ket);
 
-        return DataTable::of($builder)
-            ->addNumbering() //it will return data output with numbering on first column
-            ->toJson();
+        return $this->samarkanUntukPemeriksa(
+    DataTable::of($builder)->addNumbering()->toJson(),
+    [3, 4]
+);
     }
 }

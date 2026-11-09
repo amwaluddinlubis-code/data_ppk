@@ -40,6 +40,9 @@
                 <button type="button" class="btn btn-success btn-sm" onclick="printPdf()">
                     <i class="fas fa-print"></i> CETAK DPS
                 </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="printPdfFile()">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </button>
             </div>
         </div>
 
@@ -96,6 +99,13 @@ function printPdf() {
     var desa = $('#DESA').val();
     var tps = $('#TPS').val();
     var url = "<?= base_url('pemilih/ms') ?>" + '?desa=' + encodeURIComponent(desa) + '&tps=' + encodeURIComponent(tps);
+    window.open(url, '_blank');
+}
+
+function printPdfFile() {
+    var desa = $('#DESA').val();
+    var tps = $('#TPS').val();
+    var url = "<?= base_url('pemilih/ms-pdf') ?>" + '?desa=' + encodeURIComponent(desa) + '&tps=' + encodeURIComponent(tps);
     window.open(url, '_blank');
 }
 

@@ -61,9 +61,10 @@ class Pemilih extends BaseController
                 $builder->where('MSTPS IS NULL', null);
             }
         }
-        return DataTable::of($builder)
-            ->addNumbering() //it will return data output with numbering on first column
-            ->toJson();
+        return $this->samarkanUntukPemeriksa(
+    DataTable::of($builder)->addNumbering()->toJson(),
+    [2, 3]
+);
     }
 
     public function getPemilihBaru()
@@ -85,9 +86,10 @@ class Pemilih extends BaseController
             }
         }
 
-        return DataTable::of($builder)
-            ->addNumbering() //it will return data output with numbering on first column
-            ->toJson();
+        return $this->samarkanUntukPemeriksa(
+    DataTable::of($builder)->addNumbering()->toJson(),
+    [3]
+);
     }
 
     public function getPemilihTersaring()
@@ -103,9 +105,10 @@ class Pemilih extends BaseController
         if ($lp != '') $builder->where('LP', $lp);
         if ($ket != '') $builder->where('KET', $ket);
 
-        return DataTable::of($builder)
-            ->addNumbering() //it will return data output with numbering on first column
-            ->toJson();
+        return $this->samarkanUntukPemeriksa(
+    DataTable::of($builder)->addNumbering()->toJson(),
+    [3]
+);
     }
 
     public function aktifPrint()
@@ -131,9 +134,10 @@ class Pemilih extends BaseController
         if ($tps != '') $builder->where('TPS', $tps);
         if ($lp != '') $builder->where('JK', $lp);
 
-        return DataTable::of($builder)
-            ->addNumbering() //it will return data output with numbering on first column
-            ->toJson();
+        return $this->samarkanUntukPemeriksa(
+    DataTable::of($builder)->addNumbering()->toJson(),
+    [3, 4]
+);
     }
 
     public function ms()
@@ -147,12 +151,43 @@ class Pemilih extends BaseController
 
         $desa = $this->request->getPostGet('desa');
         $tps = $this->request->getPostGet('tps');
-        $data['dtTable'] = $dt->pemilihMS(['DESA' => $desa, 'TPS' => $tps]);
+        $data['dtTable'] = $this->samarkanBarisCetak($dt->pemilihMS(['DESA' => $desa, 'TPS' => $tps]));
         $data['desa'] = strtoupper($desa);
         $data['tps'] = strtoupper($tps);
         $data['title'] = 'CETAK PEMILIH AKTIF - HASIL PANTARLIH | ' . strtoupper($desa) . '00' . $tps;
 
+        $this->catatAkses('cetak_daftar_ms', 'Desa ' . strtoupper((string) $desa) . ' TPS ' . $tps . ' (' . count($data['dtTable']) . ' pemilih)');
+
         return view('print/print_ms', $data);
+    }
+
+    /**
+     * Fase 4 — Daftar MS yang sama sebagai berkas PDF (dompdf),
+     * dirender dari tampilan cetak yang sama dengan versi HTML.
+     */
+    public function msPdf()
+    {
+        $dt = new PemilihModel();
+
+        $desa = (string) $this->request->getGet('desa');
+        $tps  = (string) $this->request->getGet('tps');
+        $data['dtTable'] = $this->samarkanBarisCetak($dt->pemilihMS(['DESA' => $desa, 'TPS' => $tps]));
+        $data['desa'] = strtoupper($desa);
+        $data['tps'] = strtoupper($tps);
+        $data['title'] = 'CETAK PEMILIH AKTIF - HASIL PANTARLIH | ' . strtoupper($desa) . '00' . $tps;
+
+        $html = view('print/print_ms', $data);
+
+        $pdf = new \App\Libraries\pdfGenerator();
+        $namaBerkas = 'Daftar-MS-' . preg_replace('/[^A-Za-z0-9]+/', '-', strtoupper($desa)) . '-TPS' . $tps;
+        $isi = $pdf->generate($html, $namaBerkas, 'A4', 'landscape', false);
+
+        $this->catatAkses('unduh_pdf_ms', 'Desa ' . strtoupper($desa) . ' TPS ' . $tps . ' (' . count($data['dtTable']) . ' pemilih)');
+
+        return $this->response
+            ->setContentType('application/pdf')
+            ->setHeader('Content-Disposition', 'inline; filename="' . $namaBerkas . '.pdf"')
+            ->setBody($isi);
     }
 
 }

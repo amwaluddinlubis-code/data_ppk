@@ -27,12 +27,22 @@ $menus = [
     'pemilih/baru'      => ['label' => 'PEMILIH BARU', 'ikon' => 'fa-atom'],
     'pemilih/aktifPrint' => ['label' => 'PEMILIH AKTIF', 'ikon' => 'fa-file-alt'],
     'pemilih/tersaring' => ['label' => 'TERSARING', 'ikon' => 'fa-filter'],
+    'laporan'           => ['label' => 'LAPORAN RINGKASAN', 'ikon' => 'fa-chart-bar'],
     'ganti-sandi'       => ['label' => 'GANTI SANDI', 'ikon' => 'fa-key'],
 ];
 // Menu Kelola Pengguna hanya terlihat oleh Admin PPK (Fase 1);
 // peran lain tetap tertolak walau memanggil URL-nya langsung.
 if ($penggunaLogin['peran'] === 'admin') {
-    $menus['pengguna'] = ['label' => 'KELOLA PENGGUNA', 'ikon' => 'fa-users'];
+    $menus['pengguna']  = ['label' => 'KELOLA PENGGUNA', 'ikon' => 'fa-users'];
+    $menus['log-akses'] = ['label' => 'LOG AKSES', 'ikon' => 'fa-shield-alt'];
+    $menus['backup']    = ['label' => 'CADANGAN DATA', 'ikon' => 'fa-database'];
+    $menus['kecamatan'] = ['label' => 'KECAMATAN', 'ikon' => 'fa-map-marked-alt'];
+}
+// Menu tulis (Fase 2) untuk Admin & Operator; Pemeriksa tidak melihatnya.
+if (in_array($penggunaLogin['peran'], ['admin', 'operator'], true)) {
+    $menus['coklit']  = ['label' => 'KELOLA DATA COKLIT', 'ikon' => 'fa-pen'];
+    $menus['riwayat'] = ['label' => 'RIWAYAT PERUBAHAN', 'ikon' => 'fa-history'];
+    $menus['impor']   = ['label' => 'IMPOR DATA', 'ikon' => 'fa-file-import'];
 }
 ?>
 <div class="drawer lg:drawer-open">
@@ -117,6 +127,12 @@ if ($penggunaLogin['peran'] === 'admin') {
 
 <script src="<?= base_url('assets/js/jquery.min.js') ?>"></script>
 <script src="<?= base_url('assets/js/jquery.dataTables.min.js') ?>"></script>
+<script>
+// Fase 5 (CSRF): sisipkan token pada semua permintaan AJAX POST (DataTables)
+$.ajaxSetup({
+    headers: { 'X-CSRF-TOKEN': '<?= csrf_hash() ?>' }
+});
+</script>
 <script>
 <?= $this->renderSection('javascript') ?>
 </script>

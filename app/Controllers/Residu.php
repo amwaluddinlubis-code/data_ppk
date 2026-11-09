@@ -24,8 +24,9 @@ class Residu extends BaseController
         $builder = $db->table('analisis_nik_ganda')->select('DESA, TPS, KET, NIK, NKK, NAMA');
         #print($db->getLastQuery());
 
-        return DataTable::of($builder)
-            ->addNumbering() //it will return data output with numbering on first column
-            ->toJson();
+        return $this->samarkanUntukPemeriksa(
+    DataTable::of($builder)->addNumbering()->toJson(),
+    [4, 5]
+);
     }
 }

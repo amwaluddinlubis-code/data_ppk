@@ -106,8 +106,20 @@ class BaselineSkemaPemilih extends Migration
             'CREATE OR REPLACE VIEW `v_count_kk` AS SELECT `v_nkk`.`DESA` AS `DESA`, concat(\'TPS 00\',`v_nkk`.`TPS`) AS `TPS`, count(`v_nkk`.`NKK`) AS `JLH_KK` FROM `v_nkk` GROUP BY `v_nkk`.`DESA`, `v_nkk`.`TPS`;',
         ];
 
+        // Toleran untuk basis data lama hasil impor dump: pernyataan yang
+        // objeknya sudah ada dilewati, sehingga `spark migrate` aman
+        // dijalankan baik di basis data kosong maupun yang sudah berisi.
         foreach ($statements as $sql) {
-            $this->db->query($sql);
+            try {
+                $this->db->query($sql);
+            } catch (\Throwable $e) {
+                $pesan = $e->getMessage();
+                if (stripos($pesan, 'already exists') === false
+                    && stripos($pesan, 'Duplicate') === false
+                ) {
+                    throw $e;
+                }
+            }
         }
     }
 
