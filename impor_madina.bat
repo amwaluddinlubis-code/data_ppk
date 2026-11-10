@@ -1,17 +1,33 @@
 @echo off
 chcp 65001 >nul
 cd /d %~dp0
-echo ==================================================
-echo   IMPOR DATA MADINA KE APLIKASI PEMILIH PPK
-echo   (basis data baru + skema final wilayah)
-echo ==================================================
+if "%~1"=="__log" goto utama
+
+rem --- Jalankan ulang diri sendiri sambil mencatat seluruh keluaran
+rem --- ke hasil_impor.txt, agar pesan kesalahan tidak hilang walau
+rem --- jendela tertutup.
+echo Impor berjalan... seluruh keluaran dicatat ke hasil_impor.txt
+echo (Berkas itu bertambah isinya selama proses; boleh dibuka untuk memantau.)
+"%~f0" __log > "%~dp0hasil_impor.txt" 2>&1
 echo.
+echo ================= HASIL IMPOR =================
+type "%~dp0hasil_impor.txt"
+echo.
+echo Hasil lengkap juga tersimpan di berkas hasil_impor.txt
+echo di folder ini - kirimkan berkas itu bila impor gagal.
+pause
+exit /b 0
+
+:utama
+
+rem ==================================================
+rem   IMPOR DATA MADINA KE APLIKASI PEMILIH PPK
+rem   (basis data baru + skema final wilayah)
+rem ==================================================
 
 if not exist "%~dp0MADINA.xlsx" (
   echo BERKAS MADINA.xlsx TIDAK DITEMUKAN di folder ini.
   echo Salin dulu MADINA.xlsx ke folder: %~dp0
-  echo.
-  pause
   exit /b 1
 )
 
@@ -25,8 +41,6 @@ if "%PHP%"=="" (
 if "%PHP%"=="" (
   echo PHP tidak ditemukan. Pastikan Laragon terpasang,
   echo atau jalankan berkas ini dari Terminal Laragon.
-  echo.
-  pause
   exit /b 1
 )
 echo PHP dipakai: %PHP%
@@ -38,7 +52,6 @@ if errorlevel 1 (
   echo.
   echo MIGRASI GAGAL. Impor dibatalkan.
   echo Pastikan basis data pada .env sudah dibuat (kosong tidak apa-apa).
-  pause
   exit /b 1
 )
 echo.
@@ -55,7 +68,6 @@ echo.
 if errorlevel 1 (
   echo.
   echo IMPOR GAGAL. Baca pesan kesalahan di atas.
-  pause
   exit /b 1
 )
 
@@ -69,4 +81,4 @@ echo   Buka aplikasi, dasbor kabupaten akan menampilkan
 echo   23 kecamatan. Masuk awal: admin / admin123
 echo   (Bapak akan diminta mengganti sandi).
 echo ==================================================
-pause
+exit /b 0

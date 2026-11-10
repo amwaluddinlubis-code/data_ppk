@@ -60,7 +60,10 @@ class Residu extends BaseController
             ->orderBy('DESA', 'ASC')
             ->orderBy('mhc.TPS', 'ASC');
         if ($niks === []) {
-            $builder->where('1', '0', false);
+            // Tanpa NIK ganda, paksa hasil kosong dengan kondisi mentah:
+            // where('1', '0') TIDAK bisa — kunci '1' diubah PHP menjadi
+            // int sehingga BaseBuilder::getOperatorFromWhereKey() TypeError.
+            $builder->where('1 = 0', null, false);
         } else {
             $builder->whereIn('NIK', $niks);
         }
