@@ -20,13 +20,20 @@ class RiwayatModel extends Model
     protected $returnType = 'array';
     protected $allowedFields = [
         'tabel', 'kunci_uid', 'nik', 'aksi', 'data_lama', 'data_baru',
-        'kecamatan_id', 'kelurahan_id',
+        'kecamatan_id', 'kelurahan_id', 'periode_id',
+        'dokumen_jenis', 'dokumen_keterangan',
         'pengguna_id', 'pengguna_username', 'created_at',
     ];
     protected $useTimestamps = false;
 
-    /** Catat satu perubahan beserta pelakunya dari sesi. */
-    public function catat(string $aksi, ?array $lama, ?array $baru, string $tabel = 'mhc'): bool
+    /**
+     * Catat satu perubahan beserta pelakunya dari sesi.
+     *
+     * Fase B: perubahan tabel mhc otomatis terikat ke periode PDPB
+     * yang sedang berjalan; $ekstra dapat membawa dokumen bukti
+     * ('dokumen_jenis', 'dokumen_keterangan') dari formulir.
+     */
+    public function catat(string $aksi, ?array $lama, ?array $baru, string $tabel = 'mhc', array $ekstra = []): bool
     {
         $acuan = $baru ?? $lama;
         $kelurahanId = isset($acuan['kelurahan_id']) ? (int) $acuan['kelurahan_id'] : null;
@@ -41,6 +48,16 @@ class RiwayatModel extends Model
             }
         }
 
+        $periodeId = null;
+        if ($tabel === 'mhc') {
+            try {
+                $periodeId = \App\Libraries\PeriodePdpb::pastikanAktif()['id'] ?? null;
+                $periodeId = $periodeId !== null ? (int) $periodeId : null;
+            } catch (\Throwable) {
+                $periodeId = null;
+            }
+        }
+
         return (bool) $this->insert([
             'tabel'             => $tabel,
             'kunci_uid'         => $acuan['UID'] ?? null,
@@ -50,6 +67,9 @@ class RiwayatModel extends Model
             'data_baru'         => $baru !== null ? json_encode($baru) : null,
             'kecamatan_id'      => $kecamatanId,
             'kelurahan_id'      => $kelurahanId,
+            'periode_id'        => $ekstra['periode_id'] ?? $periodeId,
+            'dokumen_jenis'     => $ekstra['dokumen_jenis'] ?? null,
+            'dokumen_keterangan' => $ekstra['dokumen_keterangan'] ?? null,
             'pengguna_id'       => session()->get('pengguna_id'),
             'pengguna_username' => session()->get('pengguna_username'),
             'created_at'        => date('Y-m-d H:i:s'),

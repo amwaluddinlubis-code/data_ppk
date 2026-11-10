@@ -181,7 +181,7 @@ class Coklit extends BaseController
         $db->transStart();
         $db->table('mhc')->insert($bersih);
         $baru = $db->table('mhc')->where('UID', $uid)->get()->getRowArray();
-        (new RiwayatModel())->catat('tambah', null, $baru);
+        (new RiwayatModel())->catat('tambah', null, $baru, 'mhc', $this->dokumenDariForm());
         $db->transComplete();
 
         if (! $db->transStatus()) {
@@ -250,7 +250,7 @@ class Coklit extends BaseController
         $db->transStart();
         $db->table('mhc')->where('ID', (int) $uid)->update($bersih);
         $baru = $db->table('mhc')->where('ID', (int) $uid)->get()->getRowArray();
-        (new RiwayatModel())->catat('ubah', $lama, $baru);
+        (new RiwayatModel())->catat('ubah', $lama, $baru, 'mhc', $this->dokumenDariForm());
         $db->transComplete();
 
         if (! $db->transStatus()) {
@@ -277,7 +277,7 @@ class Coklit extends BaseController
 
         $db = $this->db();
         $db->transStart();
-        (new RiwayatModel())->catat('hapus', $lama, null);
+        (new RiwayatModel())->catat('hapus', $lama, null, 'mhc', $this->dokumenDariForm());
         $db->table('mhc')->where('ID', (int) $uid)->delete();
         $db->transComplete();
 
@@ -288,6 +288,25 @@ class Coklit extends BaseController
         $this->sentuhVersiData();
 
         return redirect()->to('coklit')->with('sukses', 'Pemilih ' . $lama['NAMA'] . ' dihapus. Salinannya tersimpan di Riwayat Perubahan dan bisa dipulihkan.');
+    }
+
+    /**
+     * Dokumen bukti perubahan dari formulir (Fase B; PKPU 1/2025
+     * Pasal 17 ayat (4)). Jenis disaring ke daftar sah; keterangan
+     * bebas (nomor/tanggal dokumen) dipotong 255 karakter.
+     *
+     * @return array{dokumen_jenis: ?string, dokumen_keterangan: ?string}
+     */
+    private function dokumenDariForm(): array
+    {
+        $keterangan = trim((string) $this->request->getPost('dokumen_keterangan'));
+
+        return [
+            'dokumen_jenis'      => \App\Libraries\DokumenBukti::saring(
+                $this->request->getPost('dokumen_jenis')
+            ),
+            'dokumen_keterangan' => $keterangan !== '' ? mb_substr($keterangan, 0, 255) : null,
+        ];
     }
 
     // -- Validasi ----------------------------------------------------

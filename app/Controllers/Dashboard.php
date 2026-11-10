@@ -46,6 +46,7 @@ class Dashboard extends BaseController
         // potongan tabel lewat endpoint tabelPemilih().
         $data['tpsAwal']      = $this->ambilDaftarTps('', 'semua');
         $data['tabelAwal']    = $this->dataTabelPemilih([]);
+        $data['pdpb']         = $this->ringkasanPdpb();
 
         return view('dashboard', $data);
     }
@@ -56,6 +57,55 @@ class Dashboard extends BaseController
      *
      * @return array{stats: array<string, int>, perWilayah: array, perKecamatan: bool}
      */
+    /**
+     * Ringkasan PDPB periode berjalan untuk kartu dasbor (Fase B).
+     * Dihitung langsung dari riwayat_perubahan terikat periode —
+     * tabelnya kecil sehingga tidak perlu cache analisis.
+     *
+     * @return array{nama: string, baru: int, tms: int, ubah: int}
+     */
+    private function ringkasanPdpb(): array
+    {
+        $kosong = ['nama' => '', 'baru' => 0, 'tms' => 0, 'ubah' => 0];
+        try {
+            $periode = \App\Libraries\PeriodePdpb::pastikanAktif();
+            if ($periode === []) {
+                return $kosong;
+            }
+            $db = db_connect();
+            $q = $db->table('riwayat_perubahan')
+                ->select('aksi, data_lama, data_baru')
+                ->where('periode_id', (int) $periode['id'])->where('tabel', 'mhc');
+            $kelId = \App\Libraries\Wilayah::kelurahanIdPengguna();
+            $kecId = \App\Libraries\Wilayah::kecEfektifId();
+            if ($kelId !== null) {
+                $q->where('kelurahan_id', $kelId);
+            } elseif ($kecId !== null) {
+                $q->where('kecamatan_id', $kecId);
+            }
+            $hasil = ['nama' => (string) $periode['nama'], 'baru' => 0, 'tms' => 0, 'ubah' => 0];
+            foreach ($q->get()->getResultArray() as $r) {
+                if ($r['aksi'] === 'tambah') {
+                    $hasil['baru']++;
+                } elseif ($r['aksi'] === 'ubah') {
+                    $lama = json_decode((string) $r['data_lama'], true) ?? [];
+                    $baru = json_decode((string) $r['data_baru'], true) ?? [];
+                    $msLama = \App\Libraries\Keterangan::isMs((string) ($lama['KET'] ?? ''));
+                    $msBaru = \App\Libraries\Keterangan::isMs((string) ($baru['KET'] ?? ''));
+                    if ($msLama && ! $msBaru) {
+                        $hasil['tms']++;
+                    } else {
+                        $hasil['ubah']++;
+                    }
+                }
+            }
+
+            return $hasil;
+        } catch (\Throwable) {
+            return $kosong;
+        }
+    }
+
     private function hitungStatistikDasbor(): array
     {
         $db = db_connect();

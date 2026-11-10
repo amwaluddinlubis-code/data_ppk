@@ -1,4 +1,3 @@
-<?php $assetBase = rtrim((string) parse_url(base_url('assets/'), PHP_URL_PATH), '/') . '/'; ?>
 <!DOCTYPE html>
 <html lang="id" data-theme="terang">
 <head>
@@ -14,8 +13,8 @@
             document.documentElement.setAttribute('data-theme', tema === 'gelap' ? 'gelap' : 'terang');
         })();
     </script>
-    <link rel="stylesheet" href="<?= esc($assetBase . 'fontawesome/css/all.min.css', 'attr') ?>">
-    <link rel="stylesheet" href="<?= esc($assetBase . 'css/app.css', 'attr') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/fontawesome/css/all.min.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
 </head>
 <body class="bg-base-200 min-h-screen">
 <?php
@@ -60,9 +59,11 @@ if (in_array($penggunaLogin['peran'], ['admin', 'operator'], true)) {
 }
 $grupMenu[] = ['grup' => 'Laporan', 'ikonGrup' => 'fa-chart-bar', 'menu' => [
     'laporan' => ['label' => 'Laporan Ringkasan', 'ikon' => 'fa-chart-line'],
+    'pdpb'    => ['label' => 'PDPB Berkelanjutan', 'ikon' => 'fa-sync-alt'],
 ]];
 $menuAdmin = ['kecamatan' => ['label' => 'Kecamatan', 'ikon' => 'fa-map-marked-alt']];
 if ($penggunaLogin['peran'] === 'admin') {
+    $menuAdmin['konteks']   = ['label' => 'Konteks Penyelenggaraan', 'ikon' => 'fa-flag'];
     $menuAdmin['pengguna']  = ['label' => 'Kelola Pengguna', 'ikon' => 'fa-users'];
     $menuAdmin['log-akses'] = ['label' => 'Log Akses', 'ikon' => 'fa-shield-alt'];
     $menuAdmin['backup']    = ['label' => 'Cadangan Data', 'ikon' => 'fa-database'];
@@ -204,10 +205,10 @@ if ($bebasWilayah) {
                         </div>
                     </div>
                     <div class="min-w-0 flex-1">
-                        <div class="truncate text-sm font-bold" title="<?= esc($penggunaLogin['nama'], 'attr') ?>"><?= esc($penggunaLogin['nama']) ?></div>
-                        <div class="mt-1 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
-                            <span class="badge badge-primary badge-xs shrink-0" title="<?= esc($labelPeran, 'attr') ?>"><?= esc($labelPeran) ?></span>
-                            <span class="min-w-0 truncate text-[11px] opacity-60" title="<?= esc($scopeLabel, 'attr') ?>"><?= esc($scopeLabel) ?></span>
+                        <div class="truncate text-sm font-bold"><?= esc($penggunaLogin['nama']) ?></div>
+                        <div class="mt-1 flex items-center gap-1.5">
+                            <span class="badge badge-primary badge-xs"><?= esc($labelPeran) ?></span>
+                            <span class="truncate text-[11px] opacity-60"><?= esc($labelTingkat) ?></span>
                         </div>
                     </div>
                     <i class="fas fa-circle text-[7px] text-success" title="Sesi aktif" aria-label="Sesi aktif"></i>
@@ -333,9 +334,9 @@ if ($bebasWilayah) {
     </label>
 </nav>
 
-<script src="<?= esc($assetBase . 'js/jquery.min.js', 'attr') ?>"></script>
-<script src="<?= esc($assetBase . 'js/htmx.min.js', 'attr') ?>"></script>
-<script defer src="<?= esc($assetBase . 'js/alpine.min.js', 'attr') ?>"></script>
+<script src="<?= base_url('assets/js/jquery.min.js') ?>"></script>
+<script src="<?= base_url('assets/js/htmx.min.js') ?>"></script>
+<script defer src="<?= base_url('assets/js/alpine.min.js') ?>"></script>
 <script>
 // Fase 5 (CSRF): sisipkan token pada semua permintaan AJAX POST (DataTables)
 $.ajaxSetup({
@@ -397,79 +398,6 @@ setTimeout(function () {
         setTimeout(function () { el.remove(); }, 450);
     });
 }, 6000);
-</script>
-<script>
-// Filter chips are generated from the same controls sent to the HTMX table.
-(function () {
-    function initializeFilter(panel) {
-        var chipContainer = panel.querySelector('[data-filter-chips]');
-        var controlGroup = panel.querySelector('[data-filter-controls]');
-        var controls = controlGroup ? Array.prototype.slice.call(controlGroup.querySelectorAll('select[name], input[type="text"][name]'))
-            .filter(function (field) { return field.tagName === 'SELECT' || field.closest('label'); }) : [];
-
-        if (!chipContainer || !controls || !controls.length) return;
-
-        function refreshChips() {
-            chipContainer.replaceChildren();
-            controls.forEach(function (field) {
-                var value = field.value.trim();
-                if (!value) return;
-
-                var label = field.closest('label');
-                var labelText = label && label.querySelector('.label-text');
-                var name = labelText ? labelText.textContent.trim() : field.name;
-                var displayValue = field.tagName === 'SELECT'
-                    ? field.options[field.selectedIndex].textContent.trim()
-                    : value;
-                var chip = document.createElement('button');
-                chip.type = 'button';
-                chip.className = 'badge badge-outline h-auto min-h-7 gap-1.5 px-2.5 py-1 font-medium hover:badge-primary';
-                chip.textContent = name + ': ' + displayValue + '  x';
-                chip.setAttribute('aria-label', 'Hapus filter ' + name);
-                chip.addEventListener('click', function () {
-                    field.value = '';
-                    if (field.tagName === 'SELECT') {
-                        field.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                    refreshChips();
-                    var apply = panel.querySelector('[data-filter-apply]');
-                    if (apply) apply.click();
-                });
-                chipContainer.appendChild(chip);
-            });
-            var kosong = chipContainer.childElementCount === 0;
-            chipContainer.hidden = kosong;
-            chipContainer.classList.toggle('hidden', kosong);
-        }
-
-        controls.forEach(function (field) {
-            field.addEventListener('input', refreshChips);
-            field.addEventListener('change', refreshChips);
-        });
-
-        var reset = panel.querySelector('[data-filter-reset]');
-        if (reset) {
-            reset.addEventListener('click', function () {
-                var changedSelects = [];
-                controls.forEach(function (field) {
-                    if (!field.value) return;
-                    field.value = '';
-                    if (field.tagName === 'SELECT') changedSelects.push(field);
-                });
-                changedSelects.forEach(function (field) {
-                    field.dispatchEvent(new Event('change', { bubbles: true }));
-                });
-                refreshChips();
-                var apply = panel.querySelector('[data-filter-apply]');
-                if (apply) apply.click();
-            });
-        }
-
-        refreshChips();
-    }
-
-    document.querySelectorAll('[data-filter-panel]').forEach(initializeFilter);
-})();
 </script>
 <script>
 // Filter TPS dinamis: isi pilihan #TPS dari nomor yang benar-benar
@@ -597,13 +525,9 @@ function muatDaftarTps(desa) {
 // hx-*, dan handler change lama (HTMX/jQuery/inline) tetap bekerja
 // karena pilihan diterapkan ke select lalu peristiwa change dikirim.
 (function () {
-    function teksRingkas(teks) {
-        return (teks || '').replace(/\s+/g, ' ').trim();
-    }
-
     function labelTerpilih(sel) {
         var op = sel.options[sel.selectedIndex];
-        return op ? teksRingkas(op.textContent) : '';
+        return op ? op.textContent : '';
     }
 
     function tingkatkan(sel) {
@@ -649,7 +573,7 @@ function muatDaftarTps(desa) {
             Array.prototype.forEach.call(sel.options, function (op) {
                 var li = document.createElement('li');
                 var a = document.createElement('a');
-                a.textContent = teksRingkas(op.textContent);
+                a.textContent = op.textContent;
                 if (op.value === sel.value) a.classList.add('active');
                 a.addEventListener('mousedown', function (ev) {
                     ev.preventDefault();

@@ -105,4 +105,14 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     // Pencarian global (Paket Menengah)
     $routes->get('cari', 'Pencarian::index');
     $routes->post('anomali/acuan', 'Anomali::simpanAcuan');
+
+    // Konteks penyelenggaraan (Fase A) — admin
+    $routes->get('konteks', 'Konteks::index');
+    $routes->post('konteks/simpan', 'Konteks::simpan');
+
+    // PDPB berkelanjutan (Fase B)
+    $routes->get('pdpb', 'Pdpb::index');
+    $routes->get('pdpb/cetak', 'Pdpb::cetak');
+    $routes->post('pdpb/tutup', 'Pdpb::tutup');
+    $routes->post('pdpb/nama', 'Pdpb::gantiNama');
 });

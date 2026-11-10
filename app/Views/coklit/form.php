@@ -143,7 +143,21 @@ $tglLahirInput = (string) ($lamaInput['TGL_LAHIR_INPUT']
                     <span class="label"><span class="label-text font-semibold">TANGGAL COKLIT</span></span>
                     <input type="date" name="TGL_COKLIT" value="<?= esc($nilai('TGL_COKLIT'), 'attr') ?>" class="input input-bordered input-sm">
                 </label>
+                <label class="form-control">
+                    <span class="label"><span class="label-text font-semibold">DOKUMEN BUKTI PERUBAHAN</span></span>
+                    <select name="dokumen_jenis" class="select select-bordered select-sm">
+                        <option value="">— Tanpa dokumen —</option>
+                        <?php foreach (\App\Libraries\DokumenBukti::DAFTAR as $dok) : ?>
+                            <option value="<?= esc($dok, 'attr') ?>"><?= esc($dok) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label class="form-control">
+                    <span class="label"><span class="label-text font-semibold">KETERANGAN DOKUMEN</span></span>
+                    <input type="text" name="dokumen_keterangan" maxlength="255" placeholder="Nomor / tanggal dokumen" class="input input-bordered input-sm">
+                </label>
             </div>
+            <p class="text-xs opacity-60 mt-2">Dokumen bukti mengikuti PKPU PDPB Pasal 17 ayat (4): perubahan data pemilih dibuktikan dokumen administrasi kependudukan atau dokumen pendukung lain yang sah. Tercatat di Riwayat Perubahan dan Rekap PDPB periode berjalan.</p>
 
             <div class="flex gap-2 mt-5">
                 <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save"></i> SIMPAN</button>

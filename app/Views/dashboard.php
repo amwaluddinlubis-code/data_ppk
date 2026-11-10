@@ -15,6 +15,27 @@ $kartu = [
     ['label' => 'Jumlah KK (MS)', 'nilai' => $stats['kk'], 'ikon' => 'fa-home', 'warna' => 'bg-secondary text-secondary-content'],
 ];
 ?>
+<?php
+$konteksJenis = \App\Libraries\Konteks::jenis();
+$konteksNama = \App\Libraries\Konteks::nama();
+$batasTps = \App\Libraries\Konteks::batasTps();
+$tglPungut = \App\Libraries\Konteks::tanggalPemungutan();
+?>
+<!-- Konteks penyelenggaraan aktif (Fase A) -->
+<div class="flex flex-wrap items-center gap-2 mb-3">
+    <span class="badge badge-primary gap-1"><i class="fas fa-flag"></i> <?= esc($konteksNama) ?></span>
+    <span class="badge badge-outline"><?= esc(\App\Libraries\Konteks::labelJenis()) ?></span>
+    <?php if ($batasTps !== null) : ?>
+        <span class="badge badge-outline">Batas <?= $batasTps ?> pemilih/TPS</span>
+    <?php endif; ?>
+    <?php if ($tglPungut !== null) : ?>
+        <span class="badge badge-outline">Pemungutan: <?= esc(date('d-m-Y', strtotime($tglPungut))) ?></span>
+    <?php endif; ?>
+    <?php if (session()->get('pengguna_peran') === 'admin') : ?>
+        <a href="<?= base_url('konteks') ?>" class="link link-primary text-xs">Ubah konteks</a>
+    <?php endif; ?>
+</div>
+
 <!-- Kartu statistik -->
 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
     <?php foreach ($kartu as $k) : ?>
@@ -68,6 +89,33 @@ $kartu = [
                 </a>
             <?php endforeach; ?>
         </div>
+    </div>
+</div>
+
+<!-- PDPB periode berjalan (Fase B) -->
+<div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+            <i class="fas fa-sync-alt text-primary"></i>
+            <span class="font-bold text-sm">PDPB — PERIODE BERJALAN</span>
+            <span class="badge badge-outline badge-sm"><?= esc($pdpb['nama']) ?></span>
+            <a href="<?= base_url('pdpb') ?>" class="link link-primary text-xs ml-auto">Buka Rekap PDPB →</a>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+            <div class="bg-base-200/60 rounded-box p-3">
+                <div class="text-xs font-semibold opacity-70">PEMILIH BARU</div>
+                <div class="text-2xl font-bold mt-1"><?= $fmt($pdpb['baru']) ?></div>
+            </div>
+            <div class="bg-base-200/60 rounded-box p-3">
+                <div class="text-xs font-semibold opacity-70">MASUK TMS</div>
+                <div class="text-2xl font-bold mt-1"><?= $fmt($pdpb['tms']) ?></div>
+            </div>
+            <div class="bg-base-200/60 rounded-box p-3">
+                <div class="text-xs font-semibold opacity-70">UBAH ELEMEN DATA</div>
+                <div class="text-2xl font-bold mt-1"><?= $fmt($pdpb['ubah']) ?></div>
+            </div>
+        </div>
+        <p class="text-xs opacity-60 mt-2">Perubahan tercatat pada wilayah Anda selama periode PDPB berjalan — direkap paling sedikit setiap 3 bulan (PKPU 1/2025 Pasal 9 ayat (2)).</p>
     </div>
 </div>
 
