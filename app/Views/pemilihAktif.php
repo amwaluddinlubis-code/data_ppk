@@ -5,7 +5,7 @@
      @htmx:before-request="memuat = true" @htmx:after-request="memuat = false">
     <div class="card-body p-4">
         <div class="flex items-center gap-2 mb-2">
-            <span class="badge badge-info badge-sm" x-show="memuat" x-cloak>
+            <span class="badge badge-info badge-sm hidden" x-bind:class="{ 'hidden': !memuat }">
                 <span class="loading loading-spinner loading-xs"></span> Memuat…
             </span>
         </div>

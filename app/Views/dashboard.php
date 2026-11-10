@@ -18,7 +18,7 @@ $kartu = [
 <!-- Kartu statistik -->
 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
     <?php foreach ($kartu as $k) : ?>
-        <div class="card card-statistik bg-base-100 shadow">
+        <div class="card bg-base-100 shadow">
             <div class="card-body p-4">
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
@@ -112,7 +112,7 @@ $kartu = [
                     <span x-text="terbuka ? 'Sembunyikan' : 'Tampilkan'"></span>
                 </button>
             </div>
-            <div class="overflow-x-auto max-h-80 overflow-y-auto" x-show="terbuka" x-cloak>
+            <div class="overflow-x-auto max-h-80 overflow-y-auto hidden" x-bind:class="{ 'hidden': !terbuka }">
                 <table class="table table-sm table-zebra w-full">
                     <thead>
                         <tr>
@@ -156,7 +156,7 @@ $kartu = [
     <div class="card-body p-4">
         <div class="flex items-center gap-2 mb-1">
             <div class="font-semibold text-sm">Hasil Coklit Pantarlih</div>
-            <span class="badge badge-info badge-sm" x-show="memuat" x-cloak>
+            <span class="badge badge-info badge-sm hidden" x-bind:class="{ 'hidden': !memuat }">
                 <span class="loading loading-spinner loading-xs"></span> Memuat…
             </span>
         </div>

@@ -45,7 +45,7 @@
                        hx-get="<?= base_url('residu/tabelGanda') ?>" hx-target="#wadah-ganda" hx-swap="innerHTML"
                        hx-trigger="input changed delay:500ms" hx-include="[name='kategori']">
             </label>
-            <span class="badge badge-info badge-sm" x-show="memuat" x-cloak>
+            <span class="badge badge-info badge-sm hidden" x-bind:class="{ 'hidden': !memuat }">
                 <span class="loading loading-spinner loading-xs"></span> Memuat…
             </span>
             <div class="flex gap-2 ml-auto">

@@ -51,7 +51,7 @@ $jendela = range(max(1, $halaman - 2), min($totalHal, $halaman + 2));
                 <tr><td colspan="10" class="text-center opacity-60">Tidak ada data yang cocok.</td></tr>
             <?php endif; ?>
             <?php foreach ($rows as $i => $r) : ?>
-                <tr class="<?= \App\Libraries\Keterangan::isTms((string) $r['KET']) ? 'row-tersaring' : '' ?>">
+                <tr class="<?= \App\Libraries\Keterangan::isTms((string) $r['KET']) ? 'bg-error/10' : '' ?>">
                     <td><?= $awal + $i ?></td>
                     <td><?= esc($r['DESA']) ?></td>
                     <td><?= esc($r['TPS']) ?></td>

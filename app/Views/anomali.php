@@ -37,7 +37,7 @@
     <div class="card-body p-4">
         <div class="flex flex-wrap items-center gap-3 mb-2">
             <div class="text-sm font-bold">DUPLIKAT TERSELUBUNG — NAMA & TANGGAL LAHIR SAMA, NIK BERBEDA</div>
-            <span class="badge badge-info badge-sm" x-show="memuat" x-cloak>
+            <span class="badge badge-info badge-sm hidden" x-bind:class="{ 'hidden': !memuat }">
                 <span class="loading loading-spinner loading-xs"></span> Memuat…
             </span>
         </div>

@@ -28,7 +28,7 @@ $paginasi = ['urlTabel' => $urlTabel, 'target' => $target, 'saring' => $saring, 
             <?php foreach ($rows as $i => $r) : ?>
                 <?php // Merah muda: belum ada padanan pemilih baru (belum
                        // punya TPS tujuan) — sesuai catatan di halaman. ?>
-                <tr class="<?= empty($r['MSDESA']) ? 'row-tersaring' : '' ?>">
+                <tr class="<?= empty($r['MSDESA']) ? 'bg-error/10' : '' ?>">
                     <td><?= $awal + $i ?></td>
                     <td class="font-mono text-xs"><?= esc($r['NIK']) ?></td>
                     <td><?= esc($r['NAMA']) ?></td>

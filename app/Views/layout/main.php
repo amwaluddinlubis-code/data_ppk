@@ -14,18 +14,7 @@
         })();
     </script>
     <link rel="stylesheet" href="<?= base_url('assets/fontawesome/css/all.min.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/datatables.min.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
-    <style>
-        [x-cloak] { display: none !important; }
-        /* Menu sidebar parent-child: anak grup tersembunyi sampai
-           induknya dibuka (akordeon). */
-        .menu-grup .menu-anak { display: none; }
-        .menu-grup.terbuka .menu-anak { display: block; }
-        .menu-grup .panah-grup { transition: transform 200ms ease; }
-        .menu-grup.terbuka .panah-grup { transform: rotate(180deg); }
-        .menu-grup.punya-aktif > .menu-induk { font-weight: 700; color: hsl(var(--p)); }
-    </style>
 </head>
 <body class="bg-base-200 min-h-screen">
 <?php
@@ -246,24 +235,23 @@ if ($bebasWilayah) {
                         </ul>
                     <?php else : ?>
                         <?php $punyaAktif = $grupAktifNama === $grup['grup']; ?>
-                        <div class="menu-grup <?= $punyaAktif ? 'terbuka punya-aktif' : '' ?>" data-grup="<?= esc($grup['grup'], 'attr') ?>">
-                            <button type="button"
-                                    class="menu-induk w-full flex items-center gap-2 px-3 py-2 mt-2 rounded-lg text-[12px] font-bold uppercase tracking-wider opacity-80 hover:bg-base-200 hover:opacity-100"
-                                    aria-expanded="<?= $punyaAktif ? 'true' : 'false' ?>">
-                                <i class="fas <?= $grup['ikonGrup'] ?? 'fa-folder' ?> w-5 text-center"></i>
-                                <span class="flex-1 text-left"><?= esc($grup['grup']) ?></span>
-                                <i class="fas fa-chevron-down panah-grup text-[10px]"></i>
-                            </button>
-                            <ul class="menu menu-anak p-0 pl-3 gap-1 text-sm w-full">
-                                <?php foreach ($grup['menu'] as $kunci => $m) : ?>
-                                    <li>
-                                        <a href="<?= base_url($kunci) ?>"
-                                           class="<?= $kunciAktif === $kunci ? 'active' : '' ?>">
-                                            <i class="fas <?= $m['ikon'] ?> w-5 text-center"></i> <?= $m['label'] ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
+                        <div class="collapse collapse-arrow bg-base-200/50 rounded-box mb-1 <?= $punyaAktif ? 'punya-aktif' : '' ?>" data-grup="<?= esc($grup['grup'], 'attr') ?>">
+                            <input type="checkbox" class="grup-cek min-h-0" <?= $punyaAktif ? 'checked' : '' ?> aria-label="Buka/tutup grup <?= esc($grup['grup'], 'attr') ?>">
+                            <div class="collapse-title min-h-0 py-2.5 text-[12px] font-bold uppercase tracking-wider flex items-center gap-2 <?= $punyaAktif ? 'text-primary' : 'opacity-80' ?>">
+                                <i class="fas <?= $grup['ikonGrup'] ?? 'fa-folder' ?> w-5 text-center"></i> <?= esc($grup['grup']) ?>
+                            </div>
+                            <div class="collapse-content px-2">
+                                <ul class="menu p-0 gap-1 text-sm w-full">
+                                    <?php foreach ($grup['menu'] as $kunci => $m) : ?>
+                                        <li>
+                                            <a href="<?= base_url($kunci) ?>"
+                                               class="<?= $kunciAktif === $kunci ? 'active' : '' ?>">
+                                                <i class="fas <?= $m['ikon'] ?> w-5 text-center"></i> <?= $m['label'] ?>
+                                            </a>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
                         </div>
                     <?php endif; ?>
                 <?php endforeach; ?>
@@ -320,7 +308,6 @@ if ($bebasWilayah) {
 </nav>
 
 <script src="<?= base_url('assets/js/jquery.min.js') ?>"></script>
-<script src="<?= base_url('assets/js/jquery.dataTables.min.js') ?>"></script>
 <script src="<?= base_url('assets/js/htmx.min.js') ?>"></script>
 <script defer src="<?= base_url('assets/js/alpine.min.js') ?>"></script>
 <script>
@@ -415,35 +402,158 @@ function muatDaftarTps(desa) {
 }
 </script>
 <script>
-// Menu sidebar parent-child (akordeon): satu grup terbuka dalam satu
-// waktu. Grup berisi halaman aktif selalu terbuka; selain itu pilihan
-// terakhir pengguna diingat per peramban.
+// Menu sidebar parent-child memakai komponen collapse DaisyUI.
+// Skrip ini hanya mengatur perilaku akordeon (satu grup terbuka) dan
+// mengingat grup terakhir per peramban; grup berisi halaman aktif
+// selalu terbuka (dicentang dari server).
 (function () {
-    var grups = Array.prototype.slice.call(document.querySelectorAll('#nav-samping .menu-grup'));
+    var grups = Array.prototype.slice.call(document.querySelectorAll('#nav-samping [data-grup]'));
     if (!grups.length) return;
-    function atur(grup, buka) {
-        grup.classList.toggle('terbuka', buka);
-        var induk = grup.querySelector('.menu-induk');
-        if (induk) induk.setAttribute('aria-expanded', buka ? 'true' : 'false');
-    }
     var adaAktif = grups.some(function (g) { return g.classList.contains('punya-aktif'); });
     if (!adaAktif) {
         var simpan = null;
         try { simpan = localStorage.getItem('grup-menu-pemilih'); } catch (e) {}
-        grups.forEach(function (g) { atur(g, g.getAttribute('data-grup') === simpan); });
+        grups.forEach(function (g) {
+            var cek = g.querySelector('.grup-cek');
+            if (cek) cek.checked = g.getAttribute('data-grup') === simpan;
+        });
     }
     grups.forEach(function (g) {
-        var induk = g.querySelector('.menu-induk');
-        if (!induk) return;
-        induk.addEventListener('click', function () {
-            var akanBuka = !g.classList.contains('terbuka');
-            grups.forEach(function (lain) { atur(lain, lain === g ? akanBuka : false); });
-            try {
-                if (akanBuka) localStorage.setItem('grup-menu-pemilih', g.getAttribute('data-grup'));
-                else localStorage.removeItem('grup-menu-pemilih');
-            } catch (e) {}
+        var cek = g.querySelector('.grup-cek');
+        if (!cek) return;
+        cek.addEventListener('change', function () {
+            if (cek.checked) {
+                grups.forEach(function (lain) {
+                    if (lain !== g) {
+                        var c = lain.querySelector('.grup-cek');
+                        if (c) c.checked = false;
+                    }
+                });
+                try { localStorage.setItem('grup-menu-pemilih', g.getAttribute('data-grup')); } catch (e) {}
+            } else {
+                try { localStorage.removeItem('grup-menu-pemilih'); } catch (e) {}
+            }
         });
     });
+})();
+</script>
+<script>
+// Select yang bisa dicari/diketik (combobox): setiap <select> DaisyUI
+// diberi kotak ketik + daftar pilihan yang menyaring saat mengetik.
+// Select aslinya disembunyikan tetapi tetap di DOM — nilai, atribut
+// hx-*, dan handler change lama (HTMX/jQuery/inline) tetap bekerja
+// karena pilihan diterapkan ke select lalu peristiwa change dikirim.
+(function () {
+    function labelTerpilih(sel) {
+        var op = sel.options[sel.selectedIndex];
+        return op ? op.textContent : '';
+    }
+
+    function tingkatkan(sel) {
+        if (sel.dataset.bisaDicari !== undefined || sel.multiple) return;
+        sel.dataset.bisaDicari = '1';
+
+        // Select yang ditukar HTMX (outerHTML, mis. daftar TPS) meninggalkan
+        // wadah lama sebagai yatim tepat sesudahnya — buang dulu.
+        var yatim = sel.nextElementSibling;
+        if (yatim && yatim.classList.contains('wadah-cari')) yatim.remove();
+
+        var wadah = document.createElement('div');
+        wadah.className = 'dropdown wadah-cari' + (sel.classList.contains('w-full') ? ' w-full' : '');
+
+        var masukan = document.createElement('input');
+        masukan.type = 'text';
+        masukan.autocomplete = 'off';
+        masukan.setAttribute('aria-label', 'Ketik untuk mencari pilihan');
+        var ukuran = sel.classList.contains('select-xs') ? 'input-xs'
+            : sel.classList.contains('select-sm') ? 'input-sm'
+            : sel.classList.contains('select-lg') ? 'input-lg' : '';
+        var kelasLebar = Array.prototype.filter.call(sel.classList, function (k) { return /^w-/.test(k); });
+        masukan.className = 'input input-bordered w-full ' + ukuran + ' ' + kelasLebar.join(' ');
+        masukan.placeholder = 'Ketik untuk mencari…';
+
+        var daftar = document.createElement('ul');
+        daftar.className = 'dropdown-content menu bg-base-100 rounded-box z-50 w-full p-2 shadow-lg border border-base-300 max-h-60 flex-nowrap overflow-y-auto';
+
+        sel.parentNode.insertBefore(wadah, sel.nextSibling);
+        wadah.appendChild(masukan);
+        wadah.appendChild(daftar);
+        sel.classList.add('hidden');
+
+        function saring(teks) {
+            var t = (teks || '').toLowerCase();
+            Array.prototype.forEach.call(daftar.children, function (li) {
+                li.style.display = li.textContent.toLowerCase().includes(t) ? '' : 'none';
+            });
+        }
+
+        function bangunDaftar() {
+            daftar.innerHTML = '';
+            Array.prototype.forEach.call(sel.options, function (op) {
+                var li = document.createElement('li');
+                var a = document.createElement('a');
+                a.textContent = op.textContent;
+                if (op.value === sel.value) a.classList.add('active');
+                a.addEventListener('mousedown', function (ev) {
+                    ev.preventDefault();
+                    sel.value = op.value;
+                    masukan.value = op.textContent;
+                    sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    masukan.blur();
+                });
+                li.appendChild(a);
+                daftar.appendChild(li);
+            });
+        }
+
+        function segarkanMasukan() {
+            masukan.value = labelTerpilih(sel);
+            bangunDaftar();
+        }
+
+        masukan.addEventListener('focus', function () {
+            bangunDaftar();
+            saring(masukan.value === labelTerpilih(sel) ? '' : masukan.value);
+            masukan.select();
+        });
+        masukan.addEventListener('input', function () { saring(masukan.value); });
+        masukan.addEventListener('keydown', function (ev) {
+            if (ev.key === 'Enter') {
+                var pertama = Array.prototype.find.call(daftar.children, function (li) { return li.style.display !== 'none'; });
+                if (pertama) {
+                    ev.preventDefault();
+                    pertama.querySelector('a').dispatchEvent(new MouseEvent('mousedown'));
+                }
+            } else if (ev.key === 'Escape') {
+                masukan.value = labelTerpilih(sel);
+                masukan.blur();
+            }
+        });
+        masukan.addEventListener('blur', function () {
+            setTimeout(function () { masukan.value = labelTerpilih(sel); }, 150);
+        });
+        sel.addEventListener('change', segarkanMasukan);
+        new MutationObserver(function () { segarkanMasukan(); }).observe(sel, { childList: true });
+
+        segarkanMasukan();
+    }
+
+    function tingkatkanSemua(akar) {
+        if (!akar || !akar.querySelectorAll) return;
+        if (akar.matches && akar.matches('select.select')) tingkatkan(akar);
+        akar.querySelectorAll('select.select').forEach(tingkatkan);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () { tingkatkanSemua(document); });
+    // Select baru yang muncul lewat tukar HTMX (termasuk select yang
+    // menggantikan select lama) ditingkatkan otomatis.
+    new MutationObserver(function (mutasi) {
+        mutasi.forEach(function (m) {
+            m.addedNodes.forEach(function (n) {
+                if (n.nodeType === 1) tingkatkanSemua(n);
+            });
+        });
+    }).observe(document.body, { childList: true, subtree: true });
 })();
 </script>
 <script>

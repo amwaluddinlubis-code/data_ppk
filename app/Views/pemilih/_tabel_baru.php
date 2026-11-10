@@ -25,7 +25,7 @@ $paginasi = ['urlTabel' => $urlTabel, 'target' => $target, 'saring' => $saring, 
             <?php foreach ($rows as $i => $r) : ?>
                 <?php // Baris biru muda: benar-benar baru (tanpa nama lama),
                        // sama seperti pewarnaan DataTables sebelumnya. ?>
-                <tr class="<?= empty($r['OLD_NAMA']) ? 'row-baru-benar' : '' ?>">
+                <tr class="<?= empty($r['OLD_NAMA']) ? 'bg-info/10' : '' ?>">
                     <td><?= $awal + $i ?></td>
                     <td><?= esc($r['DESA']) ?></td>
                     <td><?= esc($r['TPS']) ?></td>
