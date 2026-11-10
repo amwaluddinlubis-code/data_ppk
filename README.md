@@ -385,3 +385,6 @@ Langkah basis data baru: buat basis data kosong → arahkan `.env` →
 `php spark migrate` → `php spark db:seed PenggunaAwalSeeder` →
 `php spark impor:massal MADINA.xlsx --prov="SUMATERA UTARA" --kab="MANDAILING NATAL"`.
 
+### Skrip impor Windows (`impor_madina.bat`)
+
+Skrip ini mencatat keluaran proses ke `hasil_impor.txt` dan meneruskan kode keluar proses impor ke pemanggil. Jika migrasi, penyiapan akun admin, atau impor gagal, skrip berakhir dengan kode non-nol; jangan menganggap proses berhasil hanya karena jendela menampilkan log. Periksa `hasil_impor.txt` untuk pesan kegagalan.
