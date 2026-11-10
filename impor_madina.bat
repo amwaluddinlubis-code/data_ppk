@@ -9,6 +9,7 @@ rem --- jendela tertutup.
 echo Impor berjalan... seluruh keluaran dicatat ke hasil_impor.txt
 echo (Berkas itu bertambah isinya selama proses; boleh dibuka untuk memantau.)
 "%~f0" __log > "%~dp0hasil_impor.txt" 2>&1
+set "KODE_KELUAR=%ERRORLEVEL%"
 echo.
 echo ================= HASIL IMPOR =================
 type "%~dp0hasil_impor.txt"
@@ -16,7 +17,7 @@ echo.
 echo Hasil lengkap juga tersimpan di berkas hasil_impor.txt
 echo di folder ini - kirimkan berkas itu bila impor gagal.
 pause
-exit /b 0
+exit /b %KODE_KELUAR%
 
 :utama
 
@@ -58,6 +59,11 @@ echo.
 
 echo [2/3] Menyiapkan akun admin awal (dilewati bila sudah ada)...
 "%PHP%" spark db:seed PenggunaAwalSeeder
+if errorlevel 1 (
+  echo.
+  echo PENYIAPAN AKUN ADMIN GAGAL. Impor dibatalkan.
+  exit /b 1
+)
 echo.
 
 echo [3/3] Mengimpor MADINA.xlsx ...
