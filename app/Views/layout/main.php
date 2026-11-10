@@ -176,37 +176,52 @@ if ($bebasWilayah) {
     <!-- Sidebar -->
     <div class="drawer-side z-40">
         <label for="drawer-utama" class="drawer-overlay" aria-label="Tutup menu"></label>
-        <aside class="bg-base-100 w-72 min-h-full flex flex-col border-r border-base-300">
-            <div class="p-4 bg-primary text-primary-content">
-                <div class="font-bold text-lg leading-tight flex items-center gap-2">
-                    <i class="fas fa-vote-yea"></i> Data Pemilih
-                </div>
-                <div class="text-xs opacity-80">
-                    <?= $namaKabupaten !== '' ? 'Kabupaten ' . esc($namaKabupaten) : 'Aplikasi Analisis Data Pemilih' ?>
-                </div>
-            </div>
-            <div class="flex items-center gap-3 p-4 border-b border-base-200">
-                <div class="avatar placeholder">
-                    <div class="bg-neutral text-neutral-content rounded-full w-11">
-                        <span class="text-sm font-bold"><?= esc($inisial) ?></span>
+        <aside class="bg-base-100 w-72 min-h-full flex flex-col border-r border-base-300 shadow-xl">
+            <div class="relative overflow-hidden bg-gradient-to-br from-primary to-secondary p-5 text-primary-content">
+                <div class="pointer-events-none absolute -right-7 -top-10 h-32 w-32 rounded-full border-[18px] border-white/10"></div>
+                <div class="relative flex items-center gap-3">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-xl shadow-inner">
+                        <i class="fas fa-vote-yea"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="font-bold text-lg leading-tight">Data Pemilih</div>
+                        <div class="mt-1 truncate text-xs opacity-80">
+                            <?= $namaKabupaten !== '' ? 'Kabupaten ' . esc($namaKabupaten) : 'Aplikasi Analisis Data Pemilih' ?>
+                        </div>
                     </div>
                 </div>
-                <div class="min-w-0">
-                    <div class="font-semibold text-sm truncate"><?= esc($penggunaLogin['nama']) ?></div>
-                    <div class="text-xs opacity-60"><?= esc($labelTingkat) ?></div>
+                <div class="relative mt-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] opacity-80">
+                    <span class="h-1.5 w-1.5 rounded-full bg-success-content"></span>
+                    Sistem operasional
+                </div>
+            </div>
+            <div class="border-b border-base-200 p-3">
+                <div class="flex items-center gap-3 rounded-2xl bg-base-200/70 p-3">
+                    <div class="avatar placeholder">
+                        <div class="w-11 rounded-xl bg-primary text-primary-content shadow-sm">
+                            <span class="text-sm font-bold"><?= esc($inisial) ?></span>
+                        </div>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="truncate text-sm font-bold"><?= esc($penggunaLogin['nama']) ?></div>
+                        <div class="mt-1 flex items-center gap-1.5">
+                            <span class="badge badge-primary badge-xs"><?= esc($labelPeran) ?></span>
+                            <span class="truncate text-[11px] opacity-60"><?= esc($labelTingkat) ?></span>
+                        </div>
+                    </div>
+                    <i class="fas fa-circle text-[7px] text-success" title="Sesi aktif" aria-label="Sesi aktif"></i>
                 </div>
             </div>
             <?php if ($bebasWilayah) : ?>
-                <div class="px-4 py-3 border-b border-base-200">
+                <div class="border-b border-base-200 px-3 py-3">
                     <form method="post" action="<?= base_url('kecamatan/aktifkan') ?>">
                         <?= csrf_field() ?>
+                        <div class="mb-1.5 flex items-center gap-2 px-1 text-[10px] font-bold uppercase tracking-[0.16em] opacity-55">
+                            <i class="fas fa-map-marker-alt text-primary"></i> Cakupan wilayah
+                        </div>
                         <label class="form-control">
-                            <span class="label py-0 pb-1">
-                                <span class="label-text text-[11px] font-bold uppercase tracking-wider opacity-60">
-                                    <i class="fas fa-filter"></i> Filter Kecamatan
-                                </span>
-                            </span>
-                            <select name="kecamatan" class="select select-bordered select-sm w-full"
+                            <span class="sr-only">Pilih cakupan kecamatan</span>
+                            <select name="kecamatan" class="select select-bordered select-sm w-full rounded-xl bg-base-100"
                                     onchange="this.form.submit()"
                                     title="Saring seluruh tampilan ke satu kecamatan (khusus admin kabupaten)">
                                 <option value="__semua__" <?= $filterKecAktif === null ? 'selected' : '' ?>>Seluruh Kabupaten</option>
@@ -220,33 +235,40 @@ if ($bebasWilayah) {
                     </form>
                 </div>
             <?php endif; ?>
-            <nav class="flex-1 overflow-y-auto p-3" id="nav-samping">
+            <nav class="flex-1 overflow-y-auto p-3" id="nav-samping" aria-label="Navigasi utama">
+                <label class="input input-bordered input-sm mb-3 flex w-full items-center gap-2 rounded-xl bg-base-200/50 transition focus-within:border-primary focus-within:bg-base-100">
+                    <i class="fas fa-search text-xs opacity-50"></i>
+                    <input type="search" id="cari-menu-samping" class="grow" placeholder="Cari menu…"
+                           autocomplete="off" aria-label="Cari menu navigasi">
+                    <kbd class="kbd kbd-xs opacity-50">/</kbd>
+                </label>
                 <?php foreach ($grupMenu as $grup) : ?>
                     <?php if ($grup['grup'] === null) : ?>
                         <ul class="menu p-0 gap-1 text-sm w-full">
                             <?php foreach ($grup['menu'] as $kunci => $m) : ?>
                                 <li>
                                     <a href="<?= base_url($kunci) ?>"
-                                       class="<?= $kunciAktif === $kunci ? 'active' : '' ?>">
-                                        <i class="fas <?= $m['ikon'] ?> w-5 text-center"></i> <?= $m['label'] ?>
+                                       class="rounded-xl py-2.5 font-medium transition duration-200 hover:translate-x-0.5 hover:bg-base-200 <?= $kunciAktif === $kunci ? 'active bg-primary text-primary-content shadow-md shadow-primary/20 hover:bg-primary' : '' ?>">
+                                        <i class="fas <?= $m['ikon'] ?> w-5 text-center opacity-75"></i> <?= $m['label'] ?>
                                     </a>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
                     <?php else : ?>
                         <?php $punyaAktif = $grupAktifNama === $grup['grup']; ?>
-                        <div class="collapse collapse-arrow bg-base-200/50 rounded-box mb-1 <?= $punyaAktif ? 'punya-aktif' : '' ?>" data-grup="<?= esc($grup['grup'], 'attr') ?>">
+                        <div class="collapse collapse-arrow mb-1 rounded-2xl border border-transparent bg-base-200/40 transition-colors hover:border-base-300 hover:bg-base-200/70 <?= $punyaAktif ? 'punya-aktif border-primary/20 bg-primary/5' : '' ?>" data-grup="<?= esc($grup['grup'], 'attr') ?>">
                             <input type="checkbox" class="grup-cek min-h-0" <?= $punyaAktif ? 'checked' : '' ?> aria-label="Buka/tutup grup <?= esc($grup['grup'], 'attr') ?>">
-                            <div class="collapse-title min-h-0 py-2.5 text-[12px] font-bold uppercase tracking-wider flex items-center gap-2 <?= $punyaAktif ? 'text-primary' : 'opacity-80' ?>">
-                                <i class="fas <?= $grup['ikonGrup'] ?? 'fa-folder' ?> w-5 text-center"></i> <?= esc($grup['grup']) ?>
+                            <div class="collapse-title flex min-h-0 items-center gap-2 py-2.5 text-xs font-bold tracking-wide <?= $punyaAktif ? 'text-primary' : 'opacity-75' ?>">
+                                <i class="fas <?= $grup['ikonGrup'] ?? 'fa-folder' ?> flex h-7 w-7 items-center justify-center rounded-lg bg-base-100 text-primary shadow-sm"></i>
+                                <span><?= esc($grup['grup']) ?></span>
                             </div>
                             <div class="collapse-content px-2">
-                                <ul class="menu p-0 gap-1 text-sm w-full">
+                                <ul class="menu w-full gap-1 p-0 text-sm">
                                     <?php foreach ($grup['menu'] as $kunci => $m) : ?>
                                         <li>
                                             <a href="<?= base_url($kunci) ?>"
-                                               class="<?= $kunciAktif === $kunci ? 'active' : '' ?>">
-                                                <i class="fas <?= $m['ikon'] ?> w-5 text-center"></i> <?= $m['label'] ?>
+                                               class="rounded-xl py-2 font-medium transition duration-200 hover:translate-x-0.5 hover:bg-base-200 <?= $kunciAktif === $kunci ? 'active bg-primary text-primary-content shadow-md shadow-primary/20 hover:bg-primary' : '' ?>">
+                                                <i class="fas <?= $m['ikon'] ?> w-5 text-center opacity-75"></i> <?= $m['label'] ?>
                                             </a>
                                         </li>
                                     <?php endforeach; ?>
@@ -256,8 +278,11 @@ if ($bebasWilayah) {
                     <?php endif; ?>
                 <?php endforeach; ?>
             </nav>
-            <div class="p-3 text-[11px] opacity-50 border-t border-base-200">
-                CodeIgniter 4 &middot; Tailwind + DaisyUI
+            <div class="border-t border-base-200 px-4 py-3">
+                <div class="flex items-center justify-between text-[10px] opacity-50">
+                    <span>Data Pemilih PPK</span>
+                    <span class="font-semibold">CI4</span>
+                </div>
             </div>
         </aside>
     </div>
@@ -408,6 +433,7 @@ function muatDaftarTps(desa) {
 // selalu terbuka (dicentang dari server).
 (function () {
     var grups = Array.prototype.slice.call(document.querySelectorAll('#nav-samping [data-grup]'));
+    var pencarian = document.getElementById('cari-menu-samping');
     if (!grups.length) return;
     var adaAktif = grups.some(function (g) { return g.classList.contains('punya-aktif'); });
     if (!adaAktif) {
@@ -435,6 +461,59 @@ function muatDaftarTps(desa) {
             }
         });
     });
+
+    function pulihkanGrup() {
+        var simpan = null;
+        try { simpan = localStorage.getItem('grup-menu-pemilih'); } catch (e) {}
+        grups.forEach(function (g) {
+            g.hidden = false;
+            var cek = g.querySelector('.grup-cek');
+            if (cek) cek.checked = g.classList.contains('punya-aktif') || (!adaAktif && g.getAttribute('data-grup') === simpan);
+        });
+        document.querySelectorAll('#nav-samping > ul.menu').forEach(function (ul) {
+            ul.hidden = false;
+            ul.querySelectorAll(':scope > li').forEach(function (li) { li.hidden = false; });
+        });
+    }
+
+    function saringMenu() {
+        var kata = (pencarian.value || '').trim().toLocaleLowerCase('id');
+        document.querySelectorAll('#nav-samping ul.menu').forEach(function (ul) {
+            var cocok = 0;
+            ul.querySelectorAll(':scope > li').forEach(function (li) {
+                var tampil = kata === '' || li.textContent.toLocaleLowerCase('id').includes(kata);
+                li.hidden = !tampil;
+                if (tampil) cocok++;
+            });
+            var grup = ul.closest('[data-grup]');
+            if (grup) {
+                grup.hidden = kata !== '' && cocok === 0;
+                if (kata !== '' && cocok > 0) {
+                    var cek = grup.querySelector('.grup-cek');
+                    if (cek) cek.checked = true;
+                }
+            } else {
+                ul.hidden = kata !== '' && cocok === 0;
+            }
+        });
+        if (kata === '') pulihkanGrup();
+    }
+
+    if (pencarian) {
+        pencarian.addEventListener('input', saringMenu);
+        document.addEventListener('keydown', function (ev) {
+            var target = ev.target;
+            var sedangMengetik = target && (target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(target.tagName));
+            if (ev.key === '/' && !sedangMengetik && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+                ev.preventDefault();
+                pencarian.focus();
+            }
+            if (ev.key === 'Escape' && document.activeElement === pencarian) {
+                pencarian.value = '';
+                saringMenu();
+            }
+        });
+    }
 })();
 </script>
 <script>
