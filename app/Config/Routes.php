@@ -124,4 +124,16 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('pdpb/ba', 'Pdpb::ba');
     $routes->post('pdpb/ba/simpan', 'Pdpb::baSimpan');
     $routes->get('pdpb/ba/cetak', 'Pdpb::baCetak');
+
+    // Fase C — tahapan penetapan DPS/DPSHP/DPT + cetak Kelompok 2
+    $routes->get('tahapan', 'Tahapan::index');
+    $routes->post('tahapan/buka', 'Tahapan::buka');
+    $routes->post('tahapan/tetapkan', 'Tahapan::tetapkan');
+    $routes->get('tahapan/cetak-daftar', 'Tahapan::cetakDaftar');
+    $routes->get('tahapan/cetak-potensial', 'Tahapan::cetakPotensial');
+    $routes->get('tahapan/cetak-laporan-coklit', 'Tahapan::cetakLaporanCoklit');
+    $routes->get('tahapan/cetak-perubahan', 'Tahapan::cetakPerubahan');
+    $routes->get('tahapan/cetak-rekap-perubahan', 'Tahapan::cetakRekapPerubahan');
+    $routes->get('tahapan/cetak-rekap-kabko', 'Tahapan::cetakRekapKabko');
+    $routes->get('tahapan/ba', 'Tahapan::baCetak');
 });

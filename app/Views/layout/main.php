@@ -60,6 +60,7 @@ if (in_array($penggunaLogin['peran'], ['admin', 'operator'], true)) {
 $grupMenu[] = ['grup' => 'Laporan', 'ikonGrup' => 'fa-chart-bar', 'menu' => [
     'laporan' => ['label' => 'Laporan Ringkasan', 'ikon' => 'fa-chart-line'],
     'pdpb'    => ['label' => 'PDPB Berkelanjutan', 'ikon' => 'fa-sync-alt'],
+    'tahapan' => ['label' => 'Tahapan DPS–DPT', 'ikon' => 'fa-layer-group'],
 ]];
 $menuAdmin = ['kecamatan' => ['label' => 'Kecamatan', 'ikon' => 'fa-map-marked-alt']];
 if ($penggunaLogin['peran'] === 'admin') {
