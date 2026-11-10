@@ -136,4 +136,25 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('tahapan/cetak-rekap-perubahan', 'Tahapan::cetakRekapPerubahan');
     $routes->get('tahapan/cetak-rekap-kabko', 'Tahapan::cetakRekapKabko');
     $routes->get('tahapan/ba', 'Tahapan::baCetak');
+
+    // Fase D — DPTb, DPK, lokasi khusus + cetak Kelompok 3
+    $routes->get('dptb', 'Dptb::index');
+    $routes->post('dptb/simpan', 'Dptb::simpan');
+    $routes->post('dptb/hapus', 'Dptb::hapus');
+    $routes->post('dptb/loksus/simpan', 'Dptb::loksusSimpan');
+    $routes->post('dptb/loksus/hapus', 'Dptb::loksusHapus');
+    $routes->get('dptb/cetak-surat', 'Dptb::cetakSurat');
+    $routes->get('dptb/cetak-daftar-pindahan', 'Dptb::cetakDaftarPindahan');
+    $routes->get('dptb/cetak-rekap-pindahan', 'Dptb::cetakRekapPindahan');
+    $routes->get('dptb/cetak-tanda-bukti', 'Dptb::cetakTandaBukti');
+    $routes->get('dptb/cetak-daftar-hadir-dpk', 'Dptb::cetakDaftarHadirDpk');
+    $routes->get('dptb/cetak-loksus', 'Dptb::cetakLoksus');
+
+    // Fase E — ekspor-banding Sidalih + analisis beban TPS
+    $routes->get('sidalih', 'Sidalih::index');
+    $routes->get('sidalih/ekspor', 'Sidalih::ekspor');
+    $routes->post('sidalih/unggah', 'Sidalih::unggah');
+    $routes->post('sidalih/bersihkan', 'Sidalih::bersihkan');
+    $routes->get('sidalih/unduh-selisih', 'Sidalih::unduhSelisih');
+    $routes->get('beban-tps', 'BebanTps::index');
 });
