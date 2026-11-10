@@ -20,13 +20,14 @@ class Auth extends BaseController
             'title'      => $judul,
             'title_page' => $judul,
             'kecamatan'  => $this->kec,
+            'kabupaten'  => $this->kab,
         ];
     }
 
     private function wajibAdmin()
     {
         if (session()->get('pengguna_peran') !== 'admin') {
-            return redirect()->to('/')->with('galat', 'Halaman itu hanya untuk Admin PPK.');
+            return redirect()->to('/')->with('galat', 'Halaman itu hanya untuk Admin Kabupaten.');
         }
 
         return null;
@@ -59,15 +60,18 @@ class Auth extends BaseController
 
         if ((int) $pengguna['aktif'] !== 1) {
             return redirect()->to('login')->withInput()
-                ->with('galat', 'Akun ini sudah dinonaktifkan. Hubungi Admin PPK.');
+                ->with('galat', 'Akun ini sudah dinonaktifkan. Hubungi Admin Kabupaten.');
         }
 
         session()->regenerate();
+        session()->remove('grup_db');    // sisa Fase 6
+        session()->remove('kec_filter'); // saringan wilayah mulai bersih
         session()->set([
             'pengguna_id'               => (int) $pengguna['id'],
             'pengguna_nama'             => $pengguna['nama'],
             'pengguna_username'         => $pengguna['username'],
             'pengguna_peran'            => $pengguna['peran'],
+            'pengguna_kecamatan'        => $pengguna['kecamatan'] ?? null,
             'pengguna_desa'             => $pengguna['desa'],
             'pengguna_harus_ganti_sandi' => (int) $pengguna['harus_ganti_sandi'],
         ]);
@@ -137,8 +141,24 @@ class Auth extends BaseController
 
         $data = $this->dataHalaman('Kelola Pengguna');
         $data['daftar'] = (new UserModel())->orderBy('peran', 'ASC')->orderBy('nama', 'ASC')->findAll();
+        $data['daftarKecamatan'] = $this->daftarKecamatan();
+        $data['daftarDesaSemua'] = $this->daftarDesaSemua();
 
         return view('auth/pengguna', $data);
+    }
+
+    /** @return list<string> Semua desa di kabupaten (untuk pilihan PPS). */
+    private function daftarDesaSemua(): array
+    {
+        try {
+            $rows = db_connect()->table('mhc')->select('DESA')->distinct()
+                ->where('DESA IS NOT NULL')->where('DESA !=', '')
+                ->orderBy('DESA', 'ASC')->get()->getResultArray();
+
+            return array_map(static fn ($r) => (string) $r['DESA'], $rows);
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     public function tambahPengguna()
@@ -150,6 +170,7 @@ class Auth extends BaseController
         $nama     = trim((string) $this->request->getPost('nama'));
         $username = trim((string) $this->request->getPost('username'));
         $peran    = (string) $this->request->getPost('peran');
+        $kecamatan = trim((string) $this->request->getPost('kecamatan'));
         $desa     = trim((string) $this->request->getPost('desa'));
         $sandi    = (string) $this->request->getPost('sandi');
 
@@ -161,6 +182,20 @@ class Auth extends BaseController
 
         if (! in_array($peran, ['admin', 'operator', 'viewer'], true)) {
             return redirect()->back()->withInput()->with('galat', 'Peran tidak dikenal.');
+        }
+
+        // Fase 7: admin selalu tingkat kabupaten (tanpa cakupan);
+        // peran lain wajib punya cakupan kecamatan, dan PPS wajib desa.
+        if ($peran === 'admin') {
+            $kecamatan = '';
+            $desa = '';
+        } else {
+            if ($kecamatan === '' || ! in_array($kecamatan, $this->daftarKecamatan(), true)) {
+                return redirect()->back()->withInput()->with('galat', 'Pilih kecamatan cakupan untuk pengguna PPK/PPS.');
+            }
+            if ($desa !== '' && ! in_array($desa, $this->daftarDesa($kecamatan), true)) {
+                return redirect()->back()->withInput()->with('galat', 'Desa itu tidak berada di kecamatan terpilih.');
+            }
         }
 
         if (strlen($sandi) < 8) {
@@ -176,6 +211,7 @@ class Auth extends BaseController
             'username'          => $username,
             'password_hash'     => UserModel::hashSandi($sandi),
             'peran'             => $peran,
+            'kecamatan'         => $kecamatan !== '' ? $kecamatan : null,
             'desa'              => $desa !== '' ? $desa : null,
             'aktif'             => 1,
             'harus_ganti_sandi' => 1,

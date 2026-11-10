@@ -10,7 +10,7 @@
                     <select name="desa" class="select select-bordered select-sm" onchange="this.form.submit()">
                         <option value="">— SEMUA DESA (RINGKASAN) —</option>
                         <?php foreach ($daftarDesa as $d) : ?>
-                            <option value="<?= esc($d, 'attr') ?>" <?= $desaDipilih === $d ? 'selected' : '' ?>><?= esc($d) ?></option>
+                            <option value="<?= esc($d['nilai'], 'attr') ?>" <?= $pilihanAktif === $d['nilai'] ? 'selected' : '' ?>><?= esc($d['label']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
@@ -20,11 +20,12 @@
             </button>
         </div>
 
-        <h3 class="font-bold mb-2">Ringkasan Per Desa — Kec. <?= esc($kecamatan ?? '') ?></h3>
+        <h3 class="font-bold mb-2">Ringkasan Per Desa — <?= $kecamatan ? 'Kec. ' . esc(ucwords(strtolower($kecamatan))) : 'Seluruh Kabupaten ' . esc(ucwords(strtolower($kabupaten ?? ''))) ?></h3>
         <div class="overflow-x-auto">
             <table class="table table-zebra table-sm w-full">
                 <thead>
                     <tr>
+                        <?php if ($tampilKec) : ?><th>KECAMATAN</th><?php endif; ?>
                         <th>DESA</th>
                         <th class="text-right">TPS</th>
                         <th class="text-right">TOTAL COKLIT</th>
@@ -46,7 +47,8 @@
                     }
                     ?>
                     <?php foreach ($perDesa as $r) : ?>
-                        <tr class="<?= $desaDipilih === $r['DESA'] ? 'font-bold bg-base-200' : '' ?>">
+                        <tr class="<?= $pilihanAktif === $r['KEC'] . '::' . $r['DESA'] ? 'font-bold bg-base-200' : '' ?>">
+                            <?php if ($tampilKec) : ?><td><?= esc(ucwords(strtolower($r['KEC']))) ?></td><?php endif; ?>
                             <td><?= esc($r['DESA']) ?></td>
                             <td class="text-right"><?= number_format((int) $r['jumlah_tps'], 0, ',', '.') ?></td>
                             <td class="text-right"><?= number_format((int) $r['total'], 0, ',', '.') ?></td>
@@ -56,14 +58,14 @@
                             <td class="text-right"><?= number_format((int) $r['tersaring'], 0, ',', '.') ?></td>
                             <td class="text-right"><?= number_format((int) $r['pindah'], 0, ',', '.') ?></td>
                             <td class="print:hidden">
-                                <a href="<?= base_url('laporan') . '?desa=' . urlencode($r['DESA']) ?>" class="btn btn-primary btn-xs">PER TPS</a>
+                                <a href="<?= base_url('laporan') . '?desa=' . urlencode($r['KEC'] . '::' . $r['DESA']) ?>" class="btn btn-primary btn-xs">PER TPS</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
                 <tfoot>
                     <tr class="font-bold">
-                        <td>TOTAL KECAMATAN</td>
+                        <td colspan="<?= $tampilKec ? 2 : 1 ?>">TOTAL</td>
                         <td class="text-right"><?= number_format($jml['jumlah_tps'], 0, ',', '.') ?></td>
                         <td class="text-right"><?= number_format($jml['total'], 0, ',', '.') ?></td>
                         <td class="text-right"><?= number_format($jml['ms'], 0, ',', '.') ?></td>
@@ -83,7 +85,7 @@
 <?php if ($desaDipilih !== '') : ?>
     <div class="card bg-base-100 shadow print:shadow-none">
         <div class="card-body p-4">
-            <h3 class="font-bold mb-2">Rincian Per TPS — Desa <?= esc($desaDipilih) ?></h3>
+            <h3 class="font-bold mb-2">Rincian Per TPS — Desa <?= esc($desaDipilih) ?><?= $kecDipilih ? ', Kec. ' . esc(ucwords(strtolower($kecDipilih))) : '' ?></h3>
             <div class="overflow-x-auto">
                 <table class="table table-zebra table-sm w-full max-w-3xl">
                     <thead>

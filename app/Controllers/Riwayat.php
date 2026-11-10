@@ -18,6 +18,7 @@ class Riwayat extends BaseController
             'title'      => $judul,
             'title_page' => $judul,
             'kecamatan'  => $this->kec,
+            'kabupaten'  => $this->kab,
         ];
     }
 
@@ -33,6 +34,12 @@ class Riwayat extends BaseController
 
         $model = new RiwayatModel();
         $builder = $model->builder();
+        if ($this->kecEfektif() !== null) {
+            $builder->where('kecamatan', $this->kecEfektif());
+        }
+        if ($this->desaPengguna() !== null) {
+            $builder->where('desa', $this->desaPengguna());
+        }
         if ($aksi !== '') {
             $builder->where('aksi', $aksi);
         }

@@ -23,14 +23,29 @@
                 <label class="form-control w-full">
                     <span class="label-text font-semibold">Peran</span>
                     <select name="peran" class="select select-bordered w-full">
-                        <option value="operator">Operator — olah data wilayahnya</option>
+                        <option value="operator">Operator — olah data wilayahnya (PPK/PPS)</option>
                         <option value="viewer">Pemeriksa — baca + cetak saja</option>
-                        <option value="admin">Admin PPK — semua</option>
+                        <option value="admin">Admin Kabupaten — semua wilayah</option>
                     </select>
                 </label>
                 <label class="form-control w-full">
-                    <span class="label-text font-semibold">Desa (opsional)</span>
-                    <input type="text" name="desa" value="<?= esc(old('desa') ?? '') ?>" class="input input-bordered w-full" placeholder="Kosong = seluruh kecamatan">
+                    <span class="label-text font-semibold">Kecamatan cakupan (PPK/PPS)</span>
+                    <select name="kecamatan" class="select select-bordered w-full">
+                        <option value="">— Pilih kecamatan —</option>
+                        <?php foreach ($daftarKecamatan as $namaKec) : ?>
+                            <option value="<?= esc($namaKec, 'attr') ?>" <?= old('kecamatan') === $namaKec ? 'selected' : '' ?>><?= esc(ucwords(strtolower($namaKec))) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <span class="label-text-alt">Wajib untuk PPK/PPS. Admin Kabupaten mengabaikan isian ini.</span>
+                </label>
+                <label class="form-control w-full">
+                    <span class="label-text font-semibold">Desa (khusus PPS)</span>
+                    <input type="text" name="desa" list="daftar-desa" value="<?= esc(old('desa') ?? '') ?>" class="input input-bordered w-full" placeholder="Kosong = seluruh kecamatan (PPK)">
+                    <datalist id="daftar-desa">
+                        <?php foreach ($daftarDesaSemua as $namaDesa) : ?>
+                            <option value="<?= esc($namaDesa, 'attr') ?>"></option>
+                        <?php endforeach; ?>
+                    </datalist>
                     <span class="label-text-alt">Isi nama desa bila akun ini untuk PPS desa tersebut.</span>
                 </label>
                 <button type="submit" class="btn btn-primary mt-1">Tambah Pengguna</button>
@@ -52,7 +67,7 @@
                             <td><?= esc($p['nama']) ?></td>
                             <td><?= esc($p['username']) ?></td>
                             <td><?= esc(\App\Models\UserModel::labelPeran($p['peran'])) ?></td>
-                            <td><?= $p['desa'] ? esc($p['desa']) : '<span class="opacity-60">Seluruh kecamatan</span>' ?></td>
+                            <td><?= esc(\App\Models\UserModel::labelTingkat($p)) ?></td>
                             <td>
                                 <?php if ((int) $p['aktif'] === 1) : ?>
                                     <span class="badge badge-success">Aktif</span>

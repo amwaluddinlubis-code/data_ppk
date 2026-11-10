@@ -13,6 +13,7 @@ class Residu extends BaseController
         $data['title'] = 'DATA GANDA';
         $data['title_page'] = 'PEMILIH GANDA';
         $data['kecamatan'] = $this->kec;
+        $data['kabupaten'] = $this->kab;
         return view('ganda', $data);
     }
 
@@ -22,6 +23,7 @@ class Residu extends BaseController
 
         #$builder = $query->result();
         $builder = $db->table('analisis_nik_ganda')->select('DESA, TPS, KET, NIK, NKK, NAMA');
+        $this->saringWilayah($builder);
         #print($db->getLastQuery());
 
         return $this->samarkanUntukPemeriksa(

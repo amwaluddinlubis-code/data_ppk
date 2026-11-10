@@ -16,9 +16,30 @@
                 Berkas CSV/Excel dengan baris judul = nama kolom data coklit
                 (<span class="font-mono text-xs">NIK, NKK, NAMA, TMPTLHR, TGLLHR, STATUS, JENIS_KELAMIN, ALAMAT, RT, RW, DISABILITAS, EKTP, KET, SUMBER, TPS, DESA, …</span>).
                 Kolom wajib: <strong>NIK, NAMA, DESA, TPS, KET</strong>. Baris dengan NIK tidak sah dilewati dan dilaporkan.
+                Bila berkas memuat kolom <strong>KEC</strong>, baris yang kecamatannya berbeda dari kecamatan tujuan ikut dilewati.
             </p>
             <form method="post" action="<?= base_url('impor/mhc') ?>" enctype="multipart/form-data">
                 <?= csrf_field() ?>
+                <?php if ($kecTerkunci !== null) : ?>
+                    <div class="alert alert-info text-sm mb-3">
+                        Kecamatan tujuan terkunci mengikuti akun Anda: <strong><?= esc(ucwords(strtolower($kecTerkunci))) ?></strong>
+                    </div>
+                <?php else : ?>
+                    <label class="form-control mb-3">
+                        <span class="label"><span class="label-text font-semibold">KECAMATAN TUJUAN</span></span>
+                        <select name="kecamatan_target" class="select select-bordered select-sm w-full">
+                            <option value="">— Pilih kecamatan —</option>
+                            <?php foreach ($daftarKecamatan as $namaKec) : ?>
+                                <option value="<?= esc($namaKec, 'attr') ?>"><?= esc(ucwords(strtolower($namaKec))) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </label>
+                    <label class="form-control mb-3">
+                        <span class="label"><span class="label-text font-semibold">ATAU KECAMATAN BARU</span></span>
+                        <input type="text" name="kecamatan_baru" class="input input-bordered input-sm w-full" placeholder="Nama kecamatan (bila datanya pertama kali masuk)">
+                        <span class="label-text-alt">Isian ini menang atas pilihan di atas.</span>
+                    </label>
+                <?php endif; ?>
                 <label class="form-control mb-3">
                     <span class="label"><span class="label-text font-semibold">BERKAS</span></span>
                     <input type="file" name="berkas" accept=".csv,.xlsx,.xls" class="file-input file-input-bordered file-input-sm w-full" required>
@@ -30,7 +51,7 @@
                     </label>
                     <label class="label cursor-pointer justify-start gap-3">
                         <input type="radio" name="mode" value="ganti" class="radio radio-error radio-sm">
-                        <span class="label-text"><strong>GANTI SEMUA</strong> — kosongkan data coklit lalu isi dari berkas. Data lama otomatis dicadangkan ke berkas CSV di server (<span class="font-mono text-xs">writable/backup</span>) sebelum ditimpa.</span>
+                        <span class="label-text"><strong>GANTI</strong> — kosongkan data coklit <strong>kecamatan tujuan saja</strong> lalu isi dari berkas. Data lama kecamatan itu otomatis dicadangkan ke berkas CSV di server (<span class="font-mono text-xs">writable/backup</span>) sebelum ditimpa; kecamatan lain tidak tersentuh.</span>
                     </label>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Jalankan impor data coklit?');">

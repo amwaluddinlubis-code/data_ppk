@@ -11,11 +11,11 @@ class Pemilih extends BaseController
     {
         helper('url');
         $db = db_connect();
-        $builder = $db->table('desa')->select('DESA');
         $data['title'] = 'PINDAH TPS';
         $data['title_page'] = 'DAFTAR PEMILIH PINDAH TPS';
         $data['kecamatan'] = $this->kec;
-        $data['arrDesa'] = $builder->get();
+        $data['arrDesa'] = $this->daftarDesa();
+        $data['kabupaten'] = $this->kab;
         return view('pemilih', $data);
     }
 
@@ -23,11 +23,11 @@ class Pemilih extends BaseController
     {
         helper('url');
         $db = db_connect();
-        $builder = $db->table('desa')->select('DESA');
         $data['title'] = 'PEMILIH BARU';
         $data['title_page'] = 'DAFTAR PEMILIH BARU';
         $data['kecamatan'] = $this->kec;
-        $data['arrDesa'] = $builder->get();
+        $data['arrDesa'] = $this->daftarDesa();
+        $data['kabupaten'] = $this->kab;
         return view('pemilihbaru', $data);
     }
 
@@ -35,11 +35,11 @@ class Pemilih extends BaseController
     {
         helper('url');
         $db = db_connect();
-        $builder = $db->table('desa')->select('DESA');
         $data['title'] = 'PEMILIH TERSARING';
         $data['title_page'] = 'DAFTAR PEMILIH TERSARING';
         $data['kecamatan'] = $this->kec;
-        $data['arrDesa'] = $builder->get();
+        $data['arrDesa'] = $this->daftarDesa();
+        $data['kabupaten'] = $this->kab;
         return view('tersaring', $data);
     }
 
@@ -51,6 +51,7 @@ class Pemilih extends BaseController
         $lp = $this->request->getPost('lp');
         $stat = $this->request->getPost('stat');
         $builder = $db->table('pindahtps')->select('');
+        $this->saringWilayah($builder);
         if ($desa != '') $builder->where('DESA', $desa);
         if ($tps != '') $builder->where('TPS', $tps);
         if ($lp != '') $builder->where('MSLP', $lp);
@@ -75,6 +76,7 @@ class Pemilih extends BaseController
         $lp = $this->request->getPost('lp');
         $dp4 = $this->request->getPost('dp4');
         $builder = $db->table('pemilihbaru2')->select('DESA, TPS, NIK, NAMA, TGLLHR, JENIS_KELAMIN, OLD_NAMA');
+        $this->saringWilayah($builder);
         if ($desa != '') $builder->where('DESA', $desa);
         if ($tps != '') $builder->where('TPS', $tps);
         if ($lp != '') $builder->where('JENIS_KELAMIN', $lp);
@@ -100,6 +102,7 @@ class Pemilih extends BaseController
         $lp = $this->request->getPost('lp');
         $ket = $this->request->getPost('ket');
         $builder = $db->table('tersaring')->select('DESA, TPS, NIK, NAMA, TGLLHR, LP, KET');
+        $this->saringWilayah($builder);
         if ($desa != '') $builder->where('DESA', $desa);
         if ($tps != '') $builder->where('TPS', $tps);
         if ($lp != '') $builder->where('LP', $lp);
@@ -115,11 +118,11 @@ class Pemilih extends BaseController
     {
         helper('url');
         $db = db_connect();
-        $builder = $db->table('desa')->select('DESA');
         $data['title'] = 'CETAK DAFTAR PEMILIH MEMENUHI SYARAT';
         $data['title_page'] = 'CETAK DAFTAR PEMILIH MEMENUHI SYARAT';
         $data['kecamatan'] = $this->kec;
-        $data['arrDesa'] = $builder->get();
+        $data['arrDesa'] = $this->daftarDesa();
+        $data['kabupaten'] = $this->kab;
         return view('pemilihAktif', $data);
     }
 
@@ -130,6 +133,7 @@ class Pemilih extends BaseController
         $tps = $this->request->getPost('tps');
         $lp = $this->request->getPost('lp');
         $builder = $db->table('pemilih_active')->select('DESA, TPS, NKK, NIK, NAMA, TGLLHR, JK, UMUR, KET');
+        $this->saringWilayah($builder);
         if ($desa != '') $builder->where('DESA', $desa);
         if ($tps != '') $builder->where('TPS', $tps);
         if ($lp != '') $builder->where('JK', $lp);
@@ -149,9 +153,14 @@ class Pemilih extends BaseController
         // dijadwalkan pada Fase 4 (Cetak & Laporan).
         $dt = new PemilihModel();
 
-        $desa = $this->request->getPostGet('desa');
+        $desa = $this->desaPengguna() ?? $this->request->getPostGet('desa');
         $tps = $this->request->getPostGet('tps');
-        $data['dtTable'] = $this->samarkanBarisCetak($dt->pemilihMS(['DESA' => $desa, 'TPS' => $tps]));
+        $klausa = ['DESA' => $desa, 'TPS' => $tps];
+        if ($this->kecEfektif() !== null) {
+            $klausa['KEC'] = $this->kecEfektif();
+        }
+        $data['dtTable'] = $this->samarkanBarisCetak($dt->pemilihMS($klausa));
+        $data['kecamatan'] = $this->kecEfektif();
         $data['desa'] = strtoupper($desa);
         $data['tps'] = strtoupper($tps);
         $data['title'] = 'CETAK PEMILIH AKTIF - HASIL PANTARLIH | ' . strtoupper($desa) . '00' . $tps;
@@ -169,9 +178,14 @@ class Pemilih extends BaseController
     {
         $dt = new PemilihModel();
 
-        $desa = (string) $this->request->getGet('desa');
+        $desa = $this->desaPengguna() ?? (string) $this->request->getGet('desa');
         $tps  = (string) $this->request->getGet('tps');
-        $data['dtTable'] = $this->samarkanBarisCetak($dt->pemilihMS(['DESA' => $desa, 'TPS' => $tps]));
+        $klausa = ['DESA' => $desa, 'TPS' => $tps];
+        if ($this->kecEfektif() !== null) {
+            $klausa['KEC'] = $this->kecEfektif();
+        }
+        $data['dtTable'] = $this->samarkanBarisCetak($dt->pemilihMS($klausa));
+        $data['kecamatan'] = $this->kecEfektif();
         $data['desa'] = strtoupper($desa);
         $data['tps'] = strtoupper($tps);
         $data['title'] = 'CETAK PEMILIH AKTIF - HASIL PANTARLIH | ' . strtoupper($desa) . '00' . $tps;

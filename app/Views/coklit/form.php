@@ -66,6 +66,19 @@ $aksiForm = $isEdit ? base_url('coklit/update/' . $baris['UID']) : base_url('cok
                     <input type="text" name="RW" value="<?= esc($nilai('RW'), 'attr') ?>" class="input input-bordered input-sm">
                 </label>
                 <label class="form-control">
+                    <span class="label"><span class="label-text font-semibold">KECAMATAN *</span></span>
+                    <?php if ($kecTarget !== null) : ?>
+                        <input type="text" value="<?= esc(ucwords(strtolower($kecTarget)), 'attr') ?>" class="input input-bordered input-sm" disabled>
+                    <?php else : ?>
+                        <select name="KEC" class="select select-bordered select-sm">
+                            <?php foreach ($daftarKecamatan as $namaKec) : ?>
+                                <option value="<?= esc($namaKec, 'attr') ?>" <?= $nilai('KEC') === $namaKec ? 'selected' : '' ?>><?= esc(ucwords(strtolower($namaKec))) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <span class="label"><span class="label-text-alt opacity-60">Anda membuka tampilan seluruh kabupaten — pilih kecamatan tujuan baris ini. Pilihan DESA di bawah memuat semua desa; pastikan desa berada di kecamatan ini.</span></span>
+                    <?php endif; ?>
+                </label>
+                <label class="form-control">
                     <span class="label"><span class="label-text font-semibold">DESA *</span></span>
                     <?php if ($cakupan !== null) : ?>
                         <input type="text" value="<?= esc($cakupan, 'attr') ?>" class="input input-bordered input-sm" disabled>

@@ -21,7 +21,7 @@ class UserModel extends Model
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $allowedFields    = [
-        'nama', 'username', 'password_hash', 'peran', 'desa',
+        'nama', 'username', 'password_hash', 'peran', 'kecamatan', 'desa',
         'aktif', 'harus_ganti_sandi',
     ];
     protected $useTimestamps = true;
@@ -37,10 +37,31 @@ class UserModel extends Model
     public static function labelPeran(string $peran): string
     {
         return [
-            'admin'    => 'Admin PPK',
+            'admin'    => 'Admin Kabupaten',
             'operator' => 'Operator',
             'viewer'   => 'Pemeriksa',
         ][$peran] ?? $peran;
+    }
+
+    /**
+     * Fase 7 — Label tingkat pengguna mengikuti hierarki wilayah:
+     * Admin Kabupaten / PPK (per kecamatan) / PPS (per desa).
+     */
+    public static function labelTingkat(array $pengguna): string
+    {
+        if (($pengguna['peran'] ?? '') === 'admin') {
+            return 'Admin Kabupaten';
+        }
+        $desa = trim((string) ($pengguna['desa'] ?? ''));
+        if ($desa !== '') {
+            return 'PPS — ' . ucwords(strtolower($desa));
+        }
+        $kec = trim((string) ($pengguna['kecamatan'] ?? ''));
+        if ($kec !== '') {
+            return 'PPK — ' . ucwords(strtolower($kec));
+        }
+
+        return self::labelPeran((string) ($pengguna['peran'] ?? ''));
     }
 
     public function cariDenganUsername(string $username): ?array

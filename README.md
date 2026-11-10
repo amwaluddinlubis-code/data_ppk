@@ -180,6 +180,10 @@ Pengembangan lanjutan mengikuti `Kerangka_Pengembangan_App_Pemilih.md`
 
 ## Status Fase 6 (9 November 2026) — Multi-kecamatan
 
+> **DIGANTIKAN oleh Fase 7 (10 November 2026).** Konsep basis data
+> per kecamatan di bawah ini sudah tidak berlaku; riwayatnya disimpan
+> di sini hanya sebagai catatan perubahan.
+
 - Satu pemasangan melayani banyak kecamatan: daftar kecamatan & nama
   basis datanya di `app/Config/Kecamatan.php` (grup koneksi dibuat
   otomatis meniru koneksi utama). Kecamatan contoh (Sinunukan, Batang
@@ -191,3 +195,46 @@ Pengembangan lanjutan mengikuti `Kerangka_Pengembangan_App_Pemilih.md`
   `php spark migrate -g <grup>` → impor datanya lewat menu Impor.
 - **Pengguna & log akses selalu dari basis data utama** (`users` dikunci
   ke grup `default`), jadi satu akun berlaku untuk semua kecamatan.
+
+## Status Fase 7 (10 November 2026) — Konsep Kabupaten + Desain Ulang
+
+Konsep wilayah diganti total atas keputusan pengguna:
+
+- **Satu basis data = satu kabupaten.** Hierarki: Kabupaten →
+  Kecamatan → Desa/Kelurahan → TPS → Pemilih. Semua kecamatan tinggal
+  di basis data yang sama; kecamatan adalah **saringan wilayah**
+  (kolom `KEC` pada data coklit), bukan basis data terpisah.
+  Konfigurasi `app/Config/Kecamatan.php` dan grup koneksi dinamis
+  Fase 6 dicabut.
+- **Tingkat pengguna mengikuti jenjang penyelenggara:**
+  - **Admin Kabupaten** (`admin`, tanpa cakupan): melihat seluruh
+    kabupaten; dapat mengganti saringan kecamatan aktif per sesi di
+    menu **Kecamatan**.
+  - **PPK** (`operator`/`viewer` + `users.kecamatan`): terkunci ke
+    kecamatannya.
+  - **PPS** (`operator`/`viewer` + `users.kecamatan` + `users.desa`):
+    terkunci ke desanya — baca, tulis, cetak, semua hanya desanya.
+- Semua halaman & endpoint (dasbor, daftar pemilih, CRUD, riwayat,
+  laporan, cetak MS/PDF) menerapkan saringan wilayah yang sama.
+- **Impor per kecamatan:** impor data coklit selalu untuk satu
+  kecamatan tujuan (PPK terkunci ke kecamatannya; Admin memilih /
+  menulis nama kecamatan baru). Mode **GANTI hanya menimpa baris
+  kecamatan tujuan** (cadangan CSV khusus kecamatan itu dibuat
+  dahulu); baris berkas yang kolom KEC-nya berbeda dilewati.
+- Migrasi `2026-11-10-100000_KonsepKabupaten`: tambah
+  `users.kecamatan`, `riwayat_perubahan.kecamatan/desa`, dan kolom
+  `KEC` pada view `tersaring`, `pemilih_active`, `pindahtps`,
+  `analisis_nik_ganda`, `v_nkk`. Jalankan `php spark migrate` sesudah
+  memperbarui kode; data lama (satu kecamatan) otomatis menjadi isi
+  kecamatan pertamanya — tidak ada data yang dipindah.
+
+Desain ulang tampilan (Tailwind + DaisyUI, CSS dikompilasi ulang):
+
+- **Dasbor rupa kartu statistik** (total coklit, MS, baru, tersaring,
+  pindah TPS, KK) + rincian L/P + tabel per kecamatan/desa.
+- **Menu berkelompok ala Sidalih**: Data Pemilih, Pengolahan,
+  Laporan, Administrasi, Akun.
+- **Dua tema: `terang` dan `gelap`** — tombol bulan/matahari di
+  navbar, pilihan tersimpan di peramban.
+- **UI mobile**: navigasi bawah (Dasbor, Pemilih MS, Coklit,
+  Wilayah, Menu) dan kartu statistik dua kolom di HP.

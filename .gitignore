@@ -127,3 +127,7 @@ _modules/*
 
 /writable/backup/*
 !/writable/backup/index.html
+
+# Alat bangun Tailwind (Fase 7)
+tools/tailwind/node_modules/
+tools/tailwind/package-lock.json

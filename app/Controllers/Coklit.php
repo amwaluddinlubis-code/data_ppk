@@ -51,14 +51,8 @@ class Coklit extends BaseController
             'title'      => $judul,
             'title_page' => $judul,
             'kecamatan'  => $this->kec,
+            'kabupaten'  => $this->kab,
         ];
-    }
-
-    private function daftarDesa(): array
-    {
-        $rows = $this->db()->table('desa')->select('DESA')->orderBy('DESA')->get()->getResultArray();
-
-        return array_map(static fn ($r) => $r['DESA'], $rows);
     }
 
     /** Ambil satu baris mhc; hormati cakupan desa pengguna. */
@@ -66,6 +60,10 @@ class Coklit extends BaseController
     {
         $row = $this->db()->table('mhc')->where('UID', $uid)->get()->getRowArray();
         if ($row === null) {
+            return null;
+        }
+        $kecEfektif = $this->kecEfektif();
+        if ($kecEfektif !== null && ($row['KEC'] ?? null) !== $kecEfektif) {
             return null;
         }
         $cakupan = $this->desaCakupan();
@@ -107,6 +105,7 @@ class Coklit extends BaseController
         $perHal  = 25;
 
         $builder = $this->db()->table('mhc');
+        $this->saringKec($builder);
         if ($desa !== '') {
             $builder->where('DESA', $desa);
         }
@@ -144,6 +143,8 @@ class Coklit extends BaseController
         }
 
         $data = $this->dataHalaman('Tambah Pemilih');
+        $data['daftarKecamatan'] = $this->daftarKecamatan();
+        $data['kecTarget']  = $this->kecEfektif();
         $data['baris']      = null;
         $data['daftarDesa'] = $this->daftarDesa();
         $data['cakupan']    = $this->desaCakupan();
@@ -197,6 +198,8 @@ class Coklit extends BaseController
         }
 
         $data = $this->dataHalaman('Ubah Pemilih');
+        $data['daftarKecamatan'] = $this->daftarKecamatan();
+        $data['kecTarget']  = $this->kecEfektif();
         $data['baris']      = $baris;
         $data['daftarDesa'] = $this->daftarDesa();
         $data['cakupan']    = $this->desaCakupan();
@@ -288,12 +291,19 @@ class Coklit extends BaseController
             $galat[] = 'Nama wajib diisi.';
         }
 
+        // Kecamatan tujuan baris: cakupan/saringan efektif; Admin
+        // Kabupaten dalam tampilan seluruh kabupaten memilih lewat form.
+        $kecTarget = $this->kecEfektif() ?? $ambil('KEC');
+        if ($kecTarget === '' || ! in_array($kecTarget, $this->daftarKecamatan(), true)) {
+            $galat[] = 'Kecamatan tujuan tidak dikenal.';
+        }
+
         $desa = $ambil('DESA');
         $cakupan = $this->desaCakupan();
         if ($cakupan !== null) {
             $desa = $cakupan;
-        } elseif (! in_array($desa, $this->daftarDesa(), true)) {
-            $galat[] = 'Desa tidak dikenal.';
+        } elseif ($kecTarget !== '' && ! in_array($desa, $this->daftarDesa($kecTarget), true)) {
+            $galat[] = 'Desa tidak dikenal di kecamatan tujuan.';
         }
 
         $tps = $ambil('TPS');
@@ -326,12 +336,12 @@ class Coklit extends BaseController
 
         $tglCoklit = $ambil('TGL_COKLIT');
 
-        // Baris baru mewarisi PROV/KAB/KEC dari data kecamatan yang ada,
+        // Baris baru mewarisi PROV/KAB dari data kecamatan tujuan,
         // supaya tidak ada kolom wilayah yang kosong.
         $prov = null;
         $kab  = null;
         if ($uidSelf === null) {
-            $acuan = $this->db()->table('mhc')->select('PROV, KAB')->limit(1)->get()->getRowArray();
+            $acuan = $this->db()->table('mhc')->select('PROV, KAB')->where('KEC', $kecTarget)->limit(1)->get()->getRowArray();
             $prov  = $acuan['PROV'] ?? null;
             $kab   = $acuan['KAB'] ?? null;
         }
@@ -353,7 +363,7 @@ class Coklit extends BaseController
             'SUMBER'        => $ambil('SUMBER'),
             'TPS'           => $tps,
             'DESA'          => $desa,
-            'KEC'           => $this->kec,
+            'KEC'           => $kecTarget,
             'TGL_COKLIT'    => $tglCoklit !== '' ? $tglCoklit : null,
         ];
 

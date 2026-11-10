@@ -194,18 +194,9 @@ class Database extends Config
     {
         parent::__construct();
 
-        // Fase 6: daftarkan grup koneksi untuk setiap kecamatan aktif
-        // (app/Config/Kecamatan.php). Grup meniru koneksi utama dengan
-        // nama basis data yang diganti — server & kredensial sama.
-        foreach ((new Kecamatan())->yangAktif() as $entri) {
-            $grup = $entri['grup'];
-            if ($grup === 'default' || isset($this->{$grup})) {
-                continue;
-            }
-            $koneksi = $this->default;
-            $koneksi['database'] = $entri['database'];
-            $this->{$grup} = $koneksi;
-        }
+        // Fase 7: SATU grup koneksi untuk SATU basis data kabupaten.
+        // (Fase 6 yang mendaftarkan grup per kecamatan sudah dicabut —
+        // kecamatan kini saringan wilayah di dalam basis data yang sama.)
 
         // Ensure that we always set the database group to 'tests' if
         // we are currently running an automated test suite, so that

@@ -8,8 +8,8 @@
                 <span class="label"><span class="label-text font-semibold">DESA</span></span>
                 <select class="select select-bordered select-sm" id="DESA" name="desa">
                     <option value="">PILIH DESA</option>
-                    <?php foreach ($arrDesa->getResult() as $d) : ?>
-                        <option value="<?= esc($d->DESA, 'attr') ?>"><?= esc($d->DESA) ?></option>
+                    <?php foreach ($arrDesa as $d) : ?>
+                        <option value="<?= esc($d, 'attr') ?>"><?= esc($d) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>

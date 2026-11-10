@@ -10,7 +10,7 @@
         <h3 class="card-title text-base"><i class="fas fa-database"></i> Buat Cadangan Baru</h3>
         <p class="text-sm opacity-80">
             Basis data yang dicadangkan: <span class="font-mono font-bold"><?= esc($basisData) ?></span>
-            (kecamatan aktif saat ini: <?= esc($kecamatan ?? '—') ?>).
+            — berisi <strong>seluruh kabupaten</strong> (semua kecamatan). Satu cadangan cukup untuk semua wilayah.
             Hasilnya berupa berkas <span class="font-mono">.sql</span> berisi seluruh struktur &amp; data
             (termasuk tabel pengguna bila berada di basis data ini). Berkas juga tersimpan di server pada
             <span class="font-mono text-xs">writable/backup/</span>.

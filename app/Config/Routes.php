@@ -75,8 +75,10 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->post('backup/buat', 'Backup::buat');
 
     // Multi-kecamatan (Fase 6; Admin PPK, diperiksa lagi di controller)
+    // Fase 7: ganti kecamatan aktif = saringan wilayah di basis data
+    // kabupaten yang sama (bukan ganti basis data seperti Fase 6).
     $routes->get('kecamatan', 'Kecamatan::index');
-    $routes->post('kecamatan/aktifkan/(:segment)', 'Kecamatan::aktifkan/$1');
+    $routes->post('kecamatan/aktifkan', 'Kecamatan::aktifkan');
 
     // NIK Ganda
     $routes->get('residu', 'Residu::index');

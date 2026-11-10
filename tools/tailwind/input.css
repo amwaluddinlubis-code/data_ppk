@@ -36,11 +36,30 @@ table.dataTable thead th {
 table.dataTable tbody td {
   @apply border-b border-base-200;
 }
+/* datatables.min.css mengecat baris putih (#fff) — netralkan agar
+   mengikuti tema DaisyUI (terutama tema gelap). */
+table.dataTable tbody tr {
+  background-color: transparent;
+}
+table.dataTable tbody tr:hover {
+  background-color: oklch(var(--b3) / 0.3);
+}
+table.dataTable tbody tr.selected {
+  background-color: oklch(var(--p) / 0.16);
+}
 
-/* Pewarnaan baris khusus (pengganti bg-danger / bg-primary Bootstrap) */
+/* Pewarnaan baris khusus (pengganti bg-danger / bg-primary Bootstrap).
+   Memakai variabel tema DaisyUI agar tetap enak dilihat di tema gelap. */
 tr.row-tersaring td {
-  background-color: #fee2e2 !important; /* merah muda: baris bermasalah/tersaring */
+  background-color: oklch(var(--er) / 0.13) !important; /* merah muda tema: baris bermasalah/tersaring */
 }
 tr.row-baru-benar td {
-  background-color: #dbeafe !important; /* biru muda: pemilih benar-benar baru */
+  background-color: oklch(var(--in) / 0.13) !important; /* biru muda tema: pemilih benar-benar baru */
+}
+
+/* Ruang aman untuk navigasi bawah di HP (UI mobile Fase 7) */
+@media (max-width: 1023px) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

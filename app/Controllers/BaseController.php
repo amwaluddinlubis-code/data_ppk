@@ -44,12 +44,18 @@ abstract class BaseController extends Controller
     // protected $session;
 
     /**
-     * Nama kecamatan aktif (dari tabel `kec`), diisi di initController
-     * dan dipakai semua controller turunan untuk judul halaman.
-     * Bila basis data belum ada / tabel `kec` kosong (mis. halaman login
-     * sebelum impor data), nilainya null dan tampilan menanganinya.
+     * Nama kecamatan yang sedang AKTIF sebagai saringan wilayah pada
+     * sesi ini (Fase 7), diisi di initController. Null berarti tampilan
+     * seluruh kabupaten (hanya untuk pengguna tanpa cakupan kecamatan,
+     * yaitu Admin Kabupaten).
      */
     protected $kec;
+
+    /** Nama kabupaten dari data coklit (kolom KAB), null bila data kosong. */
+    protected $kab;
+
+    /** @var list<string>|null Cache daftar kecamatan pada permintaan ini. */
+    private $daftarKecCache = null;
 
     /** Pengguna yang sedang masuk (dari sesi), atau null bila belum masuk. */
     protected $pengguna;
@@ -62,38 +68,131 @@ abstract class BaseController extends Controller
         // Do Not Edit This Line
         parent::initController($request, $response, $logger);
 
-        // Fase 6: terapkan kecamatan aktif dari sesi SEBELUM koneksi
-        // basis data pertama dibuat pada permintaan ini. Pengguna &
-        // log akses tetap memakai grup 'default' secara eksplisit.
-        $grupSesi = session()->get('grup_db');
-        if ($grupSesi !== null && $grupSesi !== 'default') {
-            $entri = config('Kecamatan')->cari((string) $grupSesi);
-            if ($entri !== null && $entri['aktif']) {
-                config('Database')->defaultGroup = (string) $grupSesi;
-            } else {
-                session()->remove('grup_db');
-            }
-        }
-
+        // Fase 7: satu basis data kabupaten. Kecamatan adalah saringan
+        // wilayah: pengguna PPK/PPS terkunci ke cakupannya (kolom
+        // users.kecamatan/desa); Admin Kabupaten bebas memilih saringan
+        // lewat sesi `kec_filter` (null = seluruh kabupaten).
         try {
-            $db    = db_connect();
-            $qKec  = $db->table('kec')->select('kec')->get()->getRow();
-            $this->kec = $qKec->kec ?? null;
+            $db       = db_connect();
+            $qKab     = $db->table('mhc')->select('KAB')->where('KAB IS NOT NULL')->where('KAB !=', '')->limit(1)->get()->getRow();
+            $this->kab = $qKab->KAB ?? null;
         } catch (\Throwable) {
-            $this->kec = null;
+            $this->kab = null;
         }
+        $this->kec = $this->kecEfektif();
 
         $session = session();
         $this->pengguna = $session->get('pengguna_id') ? [
-            'id'       => $session->get('pengguna_id'),
-            'nama'     => $session->get('pengguna_nama'),
-            'username' => $session->get('pengguna_username'),
-            'peran'    => $session->get('pengguna_peran'),
-            'desa'     => $session->get('pengguna_desa'),
+            'id'        => $session->get('pengguna_id'),
+            'nama'      => $session->get('pengguna_nama'),
+            'username'  => $session->get('pengguna_username'),
+            'peran'     => $session->get('pengguna_peran'),
+            'kecamatan' => $session->get('pengguna_kecamatan'),
+            'desa'      => $session->get('pengguna_desa'),
         ] : null;
         // Preload any models, libraries, etc, here.
 
         // E.g.: $this->session = \Config\Services::session();
+    }
+
+    /** Kecamatan cakupan akun yang masuk (PPK/PPS); null = kabupaten. */
+    protected function kecPengguna(): ?string
+    {
+        $kec = session()->get('pengguna_kecamatan');
+
+        return ($kec === null || $kec === '') ? null : (string) $kec;
+    }
+
+    /** Desa cakupan akun yang masuk (PPS); null = seluruh kecamatan. */
+    protected function desaPengguna(): ?string
+    {
+        $desa = session()->get('pengguna_desa');
+
+        return ($desa === null || $desa === '') ? null : (string) $desa;
+    }
+
+    /**
+     * Kecamatan yang berlaku efektif untuk semua kueri halaman ini:
+     * cakupan akun bila ada; selain itu saringan sesi (admin); null
+     * berarti seluruh kabupaten.
+     */
+    protected function kecEfektif(): ?string
+    {
+        $kecUser = $this->kecPengguna();
+        if ($kecUser !== null) {
+            return $kecUser;
+        }
+        $filter = session()->get('kec_filter');
+
+        return ($filter === null || $filter === '') ? null : (string) $filter;
+    }
+
+    /** Terapkan saringan kecamatan efektif ke builder (bila ada). */
+    protected function saringKec($builder, string $kolom = 'KEC')
+    {
+        $kec = $this->kecEfektif();
+        if ($kec !== null) {
+            $builder->where($kolom, $kec);
+        }
+
+        return $builder;
+    }
+
+    /**
+     * Terapkan saringan wilayah penuh: kecamatan efektif + desa
+     * cakupan akun (PPS hanya boleh melihat desanya sendiri).
+     */
+    protected function saringWilayah($builder, string $kolomKec = 'KEC', string $kolomDesa = 'DESA')
+    {
+        $this->saringKec($builder, $kolomKec);
+        $desa = $this->desaPengguna();
+        if ($desa !== null) {
+            $builder->where($kolomDesa, $desa);
+        }
+
+        return $builder;
+    }
+
+    /** @return list<string> Daftar kecamatan yang ada di data coklit. */
+    protected function daftarKecamatan(): array
+    {
+        if ($this->daftarKecCache === null) {
+            try {
+                $rows = db_connect()->table('mhc')->select('KEC')->distinct()
+                    ->where('KEC IS NOT NULL')->where('KEC !=', '')
+                    ->orderBy('KEC', 'ASC')->get()->getResultArray();
+                $this->daftarKecCache = array_map(static fn ($r) => (string) $r['KEC'], $rows);
+            } catch (\Throwable) {
+                $this->daftarKecCache = [];
+            }
+        }
+
+        return $this->daftarKecCache;
+    }
+
+    /**
+     * @return list<string> Daftar desa pada kecamatan efektif (atau
+     * kecamatan yang diberikan). Akun PPS hanya mendapat desanya sendiri.
+     */
+    protected function daftarDesa(?string $kec = null): array
+    {
+        $desaUser = $this->desaPengguna();
+        if ($desaUser !== null) {
+            return [$desaUser];
+        }
+        $kec = $kec ?? $this->kecEfektif();
+        try {
+            $builder = db_connect()->table('mhc')->select('DESA')->distinct()
+                ->where('DESA IS NOT NULL')->where('DESA !=', '');
+            if ($kec !== null) {
+                $builder->where('KEC', $kec);
+            }
+            $rows = $builder->orderBy('DESA', 'ASC')->get()->getResultArray();
+
+            return array_map(static fn ($r) => (string) $r['DESA'], $rows);
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /**

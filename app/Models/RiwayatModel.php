@@ -7,8 +7,9 @@ use CodeIgniter\Model;
 /**
  * Fase 2 — Model jejak audit (riwayat_perubahan).
  *
- * DBGroup TIDAK dikunci: catatan mengikuti basis data kecamatan yang
- * sedang aktif, sama seperti data coklit yang diubah.
+ * Fase 7: satu basis data kabupaten — catatan memuat kolom wilayah
+ * (kecamatan/desa) hasil denormalisasi dari baris yang diubah, agar
+ * halaman Riwayat dapat disaring mengikuti wilayah efektif pengguna.
  */
 class RiwayatModel extends Model
 {
@@ -18,6 +19,7 @@ class RiwayatModel extends Model
     protected $returnType = 'array';
     protected $allowedFields = [
         'tabel', 'kunci_uid', 'nik', 'aksi', 'data_lama', 'data_baru',
+        'kecamatan', 'desa',
         'pengguna_id', 'pengguna_username', 'created_at',
     ];
     protected $useTimestamps = false;
@@ -34,6 +36,8 @@ class RiwayatModel extends Model
             'aksi'              => $aksi,
             'data_lama'         => $lama !== null ? json_encode($lama) : null,
             'data_baru'         => $baru !== null ? json_encode($baru) : null,
+            'kecamatan'         => $acuan['KEC'] ?? null,
+            'desa'              => $acuan['DESA'] ?? null,
             'pengguna_id'       => session()->get('pengguna_id'),
             'pengguna_username' => session()->get('pengguna_username'),
             'created_at'        => date('Y-m-d H:i:s'),

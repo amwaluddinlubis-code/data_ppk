@@ -3,81 +3,70 @@
 namespace App\Controllers;
 
 /**
- * Fase 6 — Ganti kecamatan aktif (hanya Admin PPK).
+ * Fase 7 — Pilih kecamatan aktif (saringan wilayah).
  *
- * Kecamatan aktif disimpan di sesi (`grup_db`); BaseController
- * menerapkannya ke grup basis data bawaan di awal setiap permintaan.
- * Pengguna, log akses, dan halaman ini sendiri selalu memakai
- * basis data utama.
+ * Satu basis data berisi seluruh kabupaten; halaman ini mengganti
+ * kecamatan yang sedang ditampilkan untuk pengguna tingkat kabupaten
+ * (Admin). Pengguna PPK/PPS terkunci ke cakupan akunnya — halaman ini
+ * hanya menampilkan keterangan wilayahnya.
+ *
+ * (Menggantikan Fase 6 yang mengganti basis data per kecamatan.)
  */
 class Kecamatan extends BaseController
 {
     public function index()
     {
-        if (session()->get('pengguna_peran') !== 'admin') {
-            return redirect()->to('/')->with('galat', 'Pengaturan kecamatan hanya untuk Admin PPK.');
-        }
-
-        $konfig = config('Kecamatan');
-        $grupAktif = (string) (session()->get('grup_db') ?? 'default');
-
+        $db = db_connect();
         $daftar = [];
-        foreach ($konfig->yangAktif() as $entri) {
-            $namaBasis = $entri['grup'] === 'default'
-                ? \Config\Database::connect('default')->getDatabase()
-                : $entri['database'];
-            $jumlah = null;
-            try {
-                $jumlah = \Config\Database::connect($entri['grup'])->table('mhc')->countAllResults();
-            } catch (\Throwable) {
-                $jumlah = null; // basis data belum dibangun / tidak terjangkau
-            }
+        foreach ($this->daftarKecamatan() as $namaKec) {
+            $ringkas = $db->table('mhc')
+                ->select('COUNT(*) AS pemilih, COUNT(DISTINCT DESA) AS desa, COUNT(DISTINCT DESA, TPS) AS tps', false)
+                ->where('KEC', $namaKec)->get()->getRowArray();
             $daftar[] = [
-                'grup'     => $entri['grup'],
-                'nama'     => $entri['nama'],
-                'database' => $namaBasis,
-                'jumlah'   => $jumlah,
-                'aktif'    => $grupAktif === $entri['grup'],
+                'nama'    => $namaKec,
+                'pemilih' => (int) ($ringkas['pemilih'] ?? 0),
+                'desa'    => (int) ($ringkas['desa'] ?? 0),
+                'tps'     => (int) ($ringkas['tps'] ?? 0),
+                'aktif'   => $this->kecEfektif() === $namaKec,
             ];
         }
 
+        $totalKab = (int) $db->table('mhc')->countAllResults();
+
         return view('kecamatan/index', [
             'title'      => 'Kecamatan',
-            'title_page' => 'Kecamatan & Basis Data Aktif',
+            'title_page' => 'Kecamatan — Saringan Wilayah',
             'kecamatan'  => $this->kec,
+            'kabupaten'  => $this->kab,
             'daftar'     => $daftar,
+            'totalKab'   => $totalKab,
+            'semuaAktif' => $this->kecEfektif() === null,
+            'terkunci'   => $this->kecPengguna() !== null,
         ]);
     }
 
-    public function aktifkan($grup = null)
+    public function aktifkan()
     {
-        if (session()->get('pengguna_peran') !== 'admin') {
-            return redirect()->to('/')->with('galat', 'Pengaturan kecamatan hanya untuk Admin PPK.');
+        if ($this->kecPengguna() !== null) {
+            return redirect()->to('kecamatan')
+                ->with('galat', 'Wilayah Anda terkunci mengikuti cakupan akun (' . $this->kecPengguna() . ').');
         }
 
-        $grup = (string) $grup;
-        $konfig = config('Kecamatan');
-        $entri = $konfig->cari($grup);
-        if ($entri === null || ! $entri['aktif']) {
-            return redirect()->to('kecamatan')->with('galat', 'Kecamatan itu tidak terdaftar / belum diaktifkan di konfigurasi.');
+        $pilihan = trim((string) $this->request->getPost('kecamatan'));
+        if ($pilihan === '' || $pilihan === '__semua__') {
+            session()->remove('kec_filter');
+            $this->catatAkses('ganti_kecamatan', 'Saringan wilayah: seluruh kabupaten');
+
+            return redirect()->to('/')->with('sukses', 'Menampilkan seluruh kabupaten.');
         }
 
-        if ($grup === 'default') {
-            session()->remove('grup_db');
-            $nama = 'kecamatan utama';
-        } else {
-            // Pastikan basis datanya benar-benar bisa dihubungi
-            try {
-                \Config\Database::connect($grup)->table('mhc')->countAllResults();
-            } catch (\Throwable) {
-                return redirect()->to('kecamatan')->with('galat', 'Basis data kecamatan "' . $entri['nama'] . '" belum siap (buat & migrasikan dulu).');
-            }
-            session()->set('grup_db', $grup);
-            $nama = $entri['nama'];
+        if (! in_array($pilihan, $this->daftarKecamatan(), true)) {
+            return redirect()->to('kecamatan')->with('galat', 'Kecamatan itu tidak ada di data coklit.');
         }
 
-        $this->catatAkses('ganti_kecamatan', 'Kecamatan aktif diganti ke ' . $nama);
+        session()->set('kec_filter', $pilihan);
+        $this->catatAkses('ganti_kecamatan', 'Saringan wilayah: Kecamatan ' . $pilihan);
 
-        return redirect()->to('/')->with('sukses', 'Kecamatan aktif sekarang: ' . $nama . '. Semua halaman mengikuti basis data kecamatan itu.');
+        return redirect()->to('/')->with('sukses', 'Kecamatan aktif sekarang: ' . $pilihan . '. Semua halaman mengikuti kecamatan itu.');
     }
 }
