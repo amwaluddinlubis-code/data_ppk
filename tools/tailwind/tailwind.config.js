@@ -13,6 +13,10 @@ module.exports = {
     themes: [
       {
         terang: {
+          '--rounded-box': '1.125rem',
+          '--rounded-btn': '0.75rem',
+          '--rounded-badge': '9999px',
+          '--tab-radius': '0.75rem',
           'primary': '#2563eb',
           'primary-content': '#ffffff',
           'secondary': '#0891b2',
@@ -37,6 +41,10 @@ module.exports = {
       },
       {
         gelap: {
+          '--rounded-box': '1.125rem',
+          '--rounded-btn': '0.75rem',
+          '--rounded-badge': '9999px',
+          '--tab-radius': '0.75rem',
           'primary': '#3b82f6',
           'primary-content': '#ffffff',
           'secondary': '#22d3ee',

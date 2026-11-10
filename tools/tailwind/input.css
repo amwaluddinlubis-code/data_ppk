@@ -2,11 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * Murni DaisyUI + utilitas Tailwind (permintaan AMWAL, 11 Nov 2026):
- * berkas ini sengaja TANPA aturan CSS kustom. Penyesuaian tampilan
- * dilakukan lewat kelas komponen DaisyUI dan utilitas Tailwind di
- * view — termasuk pewarnaan baris tabel (bg-error/10, bg-info/10)
- * yang sebelumnya berupa kelas kustom di sini, dan penyesuaian
- * DataTables yang sudah tidak dipakai sejak konversi HTMX.
- */
+@layer components {
+  .card {
+    @apply rounded-2xl border border-base-300/70 shadow-sm transition duration-200;
+  }
+
+  .card:hover {
+    @apply shadow-md;
+  }
+
+  .btn {
+    @apply font-semibold transition duration-150 ease-out;
+  }
+
+  .btn:active {
+    @apply scale-[0.98];
+  }
+
+  .btn:focus-visible,
+  #nav-samping a:focus-visible {
+    @apply outline outline-2 outline-offset-2;
+    outline-color: oklch(var(--p));
+  }
+
+  .input:focus,
+  .select:focus,
+  .textarea:focus,
+  .file-input:focus {
+    @apply outline outline-2;
+    border-color: oklch(var(--p));
+    outline-color: oklch(var(--p) / 0.15);
+  }
+
+  .table thead {
+    @apply bg-base-200/80 text-base-content/70;
+  }
+
+  .table thead th {
+    @apply text-[11px] font-bold uppercase tracking-wider;
+  }
+
+  .table tbody tr {
+    @apply transition-colors duration-150;
+  }
+
+  .table tbody tr:hover {
+    @apply bg-base-200/70;
+  }
+
+  .alert {
+    @apply rounded-2xl border border-base-300/60;
+  }
+
+  .drawer-content > .navbar {
+    @apply border-b border-base-300/70 bg-base-100/90 shadow-sm backdrop-blur-md;
+  }
+
+  .btm-nav {
+    @apply bg-base-100/95 backdrop-blur-md;
+  }
+}
+
+@media print {
+  .card {
+    border: 0 !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+}

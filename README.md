@@ -19,6 +19,9 @@ Fondasi diperbarui dari versi awal (CodeIgniter 4.3.2, baca-saja):
   Seeder `DataAwalSeeder` mengisi tabel `config`.
 - **Tampilan**: AdminLTE/Bootstrap diganti **Tailwind CSS 3 + DaisyUI 4**
   (CSS terkompilasi lokal di `public/assets/css/app.css`, tanpa CDN).
+  Komponen bersama menjaga konsistensi halaman operasional dan login dalam
+  tema terang/gelap. Untuk membangun ulang CSS, jalankan dari `tools/tailwind`:
+  `npx tailwindcss -c tailwind.config.js -i input.css -o ../../public/assets/css/app.css --minify`.
   jQuery + DataTables tetap dipakai untuk tabel server-side.
 - **Perbaikan bug**:
   - Filter L/P di Pindah TPS kini bekerja (sebelumnya salah kolom & salah variabel,
