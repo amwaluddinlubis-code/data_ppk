@@ -290,6 +290,7 @@ class Impor extends BaseController
         }
 
         $data = $this->dataHalaman('Hasil Impor Data Coklit');
+        $this->sentuhVersiData();
         $data['ringkasan'] = [
             'jenis' => 'Data Coklit (mhc)', 'mode' => $mode, 'berkas' => $namaBerkas,
             'kecamatan' => $targetNama,
@@ -365,6 +366,7 @@ class Impor extends BaseController
         }
 
         $data = $this->dataHalaman('Hasil Impor Keterangan TMS');
+        $this->sentuhVersiData();
         $data['ringkasan'] = [
             'jenis' => 'Keterangan Status (tms8)', 'mode' => 'tambah', 'berkas' => $namaBerkas,
             'terbaca' => count($baris) - 1, 'masuk' => $masuk, 'gagal' => $gagal,

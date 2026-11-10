@@ -108,6 +108,75 @@ abstract class BaseController extends Controller
         return Wilayah::saringId($builder, $kolomKelurahan);
     }
 
+    // -- Cache analisis (optimasi performance, 11 Nov 2026) ------------
+    //
+    // Hasil analisis berat (kartu dasbor, Deteksi Anomali, NIK Ganda,
+    // Laporan) hanya berubah bila DATA berubah, bukan bila halaman
+    // dibuka. Hasilnya disimpan di cache berkas dengan kunci yang
+    // memuat VERSI DATA (pengaturan 'versi_data') dan cakupan wilayah
+    // pengguna. Setiap mutasi data (impor, CRUD coklit, pulih
+    // riwayat) menaikkan versi lewat sentuhVersiData() sehingga cache
+    // lama otomatis tidak terpakai lagi.
+
+    private ?int $versiDataMemo = null;
+
+    /** Nomor versi data saat ini (pengaturan 'versi_data', bawaan 0). */
+    protected function versiData(): int
+    {
+        if ($this->versiDataMemo === null) {
+            $baris = db_connect()->table('pengaturan')
+                ->getWhere(['kunci' => 'versi_data'])->getRow();
+            $this->versiDataMemo = $baris ? (int) $baris->nilai : 0;
+        }
+
+        return $this->versiDataMemo;
+    }
+
+    /** Naikkan versi data — memanggil ini membatalkan semua cache analisis. */
+    protected function sentuhVersiData(): void
+    {
+        db_connect()->query(
+            "INSERT INTO pengaturan (kunci, nilai) VALUES ('versi_data', '1')
+             ON DUPLICATE KEY UPDATE nilai = CAST(nilai AS UNSIGNED) + 1"
+        );
+        $this->versiDataMemo = null;
+    }
+
+    /**
+     * Ambil hasil analisis dari cache; hitung + simpan bila belum ada.
+     *
+     * @template T
+     * @param callable(): T $hitung
+     * @return T
+     */
+    protected function ambilCacheAnalisis(string $nama, callable $hitung, bool $pakaiAcuan = false)
+    {
+        $cakupan = 'kab';
+        $kelId   = \App\Libraries\Wilayah::kelurahanIdPengguna();
+        $kecId   = \App\Libraries\Wilayah::kecEfektifId();
+        if ($kelId !== null) {
+            $cakupan = 'kel' . $kelId;
+        } elseif ($kecId !== null) {
+            $cakupan = 'kec' . $kecId;
+        }
+
+        $kunci = 'analisis_v' . $this->versiData() . '_' . $nama . '_' . $cakupan;
+        if ($pakaiAcuan) {
+            $baris = db_connect()->table('pengaturan')
+                ->getWhere(['kunci' => 'tanggal_pemungutan'])->getRow();
+            $kunci .= '_' . ($baris ? (string) $baris->nilai : '2024-02-14');
+        }
+
+        $cache = \Config\Services::cache();
+        $nilai = $cache->get($kunci);
+        if ($nilai === null) {
+            $nilai = $hitung();
+            $cache->save($kunci, $nilai, 30 * 24 * 3600);
+        }
+
+        return $nilai;
+    }
+
     // -- Tabel HTMX (pola bersama sejak konversi HTMX 10 Nov 2026) -----
 
     /**
@@ -205,7 +274,17 @@ abstract class BaseController extends Controller
     {
         $nama = $namaDasar . '-' . date('Ymd-His');
 
+        // Batas wajar Excel (optimasi 11 Nov 2026): PhpSpreadsheet
+        // membangun seluruh workbook di memori — pada data kabupaten
+        // penuh (338 ribu baris) itu melampaui batas waktu eksekusi.
+        // Di atas 50 ribu baris, unduhan dialihkan ke CSV (isi sama,
+        // jauh lebih cepat) dan nama berkasnya berakhiran .csv.
+        if ($format === 'xlsx' && count($baris) > 50000) {
+            $format = 'csv';
+        }
+
         if ($format === 'xlsx') {
+            @set_time_limit(120);
             $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
             $sheet       = $spreadsheet->getActiveSheet();
             $sheet->fromArray($judul, null, 'A1');
@@ -243,8 +322,8 @@ abstract class BaseController extends Controller
 
     /**
      * Samarkan kolom-kolom sensitif pada baris hasil bila peran yang
-     * masuk adalah Pemeriksa (padanan samarkanUntukPemeriksa untuk
-     * keluaran partial HTMX berbentuk larik).
+     * masuk adalah Pemeriksa (untuk keluaran partial HTMX berbentuk
+     * larik).
      *
      * @param list<array<string, mixed>> $rows
      * @param list<string>               $kolom
@@ -375,34 +454,6 @@ abstract class BaseController extends Controller
         }
 
         return $nilai;
-    }
-
-    /**
-     * Untuk peran Pemeriksa (viewer), NIK & NKK pada jawaban DataTables
-     * disamarkan. $kolom berisi indeks kolom pada baris data
-     * (0 = nomor urut).
-     */
-    protected function samarkanUntukPemeriksa($response, array $kolom)
-    {
-        if (session()->get('pengguna_peran') !== 'viewer') {
-            return $response;
-        }
-
-        $json = json_decode((string) $response->getBody(), true);
-        if (! is_array($json) || ! isset($json['data']) || ! is_array($json['data'])) {
-            return $response;
-        }
-
-        foreach ($json['data'] as &$baris) {
-            foreach ($kolom as $idx) {
-                if (isset($baris[$idx]) && is_string($baris[$idx])) {
-                    $baris[$idx] = $this->samarkanNomor($baris[$idx]);
-                }
-            }
-        }
-        unset($baris);
-
-        return $response->setJSON($json);
     }
 
     /**

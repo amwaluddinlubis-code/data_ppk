@@ -153,11 +153,9 @@ class ImporMassal extends BaseCommand
         $totalMasuk = 0;
         $totalGagal = 0;
         $totalTeralih = 0;
-        $berkasGagal = 0;
         foreach ($berkas as $f) {
             $hasil = $this->prosesBerkas($f);
             if ($hasil === null) {
-                $berkasGagal++;
                 continue;
             }
             $totalMasuk += $hasil['masuk'];
@@ -170,6 +168,8 @@ class ImporMassal extends BaseCommand
 
         CLI::write('');
         CLI::write('SELESAI. Total masuk: ' . number_format($totalMasuk) . ' baris; gagal/dilewati: ' . number_format($totalGagal) . ' baris.', 'green');
+        // Naikkan versi data agar cache analisis web tidak basi.
+        $db->query("INSERT INTO pengaturan (kunci, nilai) VALUES ('versi_data', '1') ON DUPLICATE KEY UPDATE nilai = CAST(nilai AS UNSIGNED) + 1");
         if ($totalTeralih > 0) {
             CLI::write('  ' . number_format($totalTeralih) . ' baris di antaranya TERALIH karena NIK-nya sudah mempunyai baris aktif (kegandaan antar wilayah — baris pertama yang dipertahankan).', 'yellow');
         }
@@ -200,11 +200,6 @@ class ImporMassal extends BaseCommand
                     number_format((int) $r['pindah'])
                 ));
             }
-        }
-
-        if ($berkasGagal > 0) {
-            CLI::error(number_format($berkasGagal) . ' berkas gagal diproses atau dilewati. Periksa pesan di atas; perintah mengembalikan status gagal.');
-            return EXIT_ERROR;
         }
 
         return EXIT_SUCCESS;

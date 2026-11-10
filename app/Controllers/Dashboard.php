@@ -3,7 +3,6 @@
 namespace App\Controllers;
 
 use App\Libraries\Keterangan;
-use \Hermawan\DataTables\DataTable;
 
 /**
  * Dasbor (rupa kartu statistik; menu ala Sidalih).
@@ -21,6 +20,44 @@ class Dashboard extends BaseController
     public function index()
     {
         helper('url');
+        $db = db_connect();
+
+        // Kartu statistik + rincian per wilayah + kartu Perlu Ditangani
+        // dihitung dari cache analisis (optimasi 11 Nov 2026): angka
+        // hanya berubah bila data berubah. Tabel Hasil Coklit di bawah
+        // tetap langsung dari basis data.
+        $bundle = $this->ambilCacheAnalisis('dasbor_statistik', fn () => $this->hitungStatistikDasbor());
+        $data['stats']        = $bundle['stats'];
+        $data['perWilayah']   = $bundle['perWilayah'];
+        $data['perKecamatan'] = $bundle['perKecamatan'];
+        $data['perlu']        = $this->ambilCacheAnalisis(
+            'dasbor_perlu',
+            fn () => $this->hitungPerluDitangani(),
+            true
+        );
+
+        $data['title']      = 'Dasbor — Data Pemilih';
+        $data['title_page'] = 'Dasbor Data Pemilih';
+        $data['kecamatan']  = $this->kec;
+        $data['kabupaten']  = $this->kab;
+        $data['arrDesa']      = $this->daftarDesa();
+        // Pilot HTMX: tabel Hasil Coklit dirender server-side sejak
+        // muat pertama; saringan & pagination berikutnya menukar
+        // potongan tabel lewat endpoint tabelPemilih().
+        $data['tpsAwal']      = $this->ambilDaftarTps('', 'semua');
+        $data['tabelAwal']    = $this->dataTabelPemilih([]);
+
+        return view('dashboard', $data);
+    }
+
+    /**
+     * Kartu statistik + tabel rincian per wilayah (bagian dasbor yang
+     * mahal: beberapa pemindaian agregat atas mhc dan view v_nkk).
+     *
+     * @return array{stats: array<string, int>, perWilayah: array, perKecamatan: bool}
+     */
+    private function hitungStatistikDasbor(): array
+    {
         $db = db_connect();
 
         // -- Kartu statistik (mengikuti wilayah efektif) ---------------
@@ -82,33 +119,22 @@ class Dashboard extends BaseController
             )->groupBy('kelurahan.nama')->orderBy('wilayah')->get()->getResultArray();
         }
 
-        $data['title']      = 'Dasbor — Data Pemilih';
-        $data['title_page'] = 'Dasbor Data Pemilih';
-        $data['kecamatan']  = $this->kec;
-        $data['kabupaten']  = $this->kab;
-        $data['stats']      = [
-            'total'     => (int) ($ringkas['total'] ?? 0),
-            'ms'        => (int) ($ringkas['ms'] ?? 0),
-            'baru'      => (int) ($ringkas['baru'] ?? 0),
-            'tersaring' => (int) ($ringkas['tersaring'] ?? 0),
-            'pindah'    => (int) ($ringkas['pindah'] ?? 0),
-            'kk'        => $jumlahKk,
-            'desa'      => (int) ($ringkas['jumlah_desa'] ?? 0),
-            'tps'       => (int) ($ringkas['jumlah_tps'] ?? 0),
-            'laki'      => (int) ($lp['laki'] ?? 0),
-            'perempuan' => (int) ($lp['perempuan'] ?? 0),
+        return [
+            'stats' => [
+                'total'     => (int) ($ringkas['total'] ?? 0),
+                'ms'        => (int) ($ringkas['ms'] ?? 0),
+                'baru'      => (int) ($ringkas['baru'] ?? 0),
+                'tersaring' => (int) ($ringkas['tersaring'] ?? 0),
+                'pindah'    => (int) ($ringkas['pindah'] ?? 0),
+                'kk'        => $jumlahKk,
+                'desa'      => (int) ($ringkas['jumlah_desa'] ?? 0),
+                'tps'       => (int) ($ringkas['jumlah_tps'] ?? 0),
+                'laki'      => (int) ($lp['laki'] ?? 0),
+                'perempuan' => (int) ($lp['perempuan'] ?? 0),
+            ],
+            'perWilayah'   => $perWilayah,
+            'perKecamatan' => $perKecamatan,
         ];
-        $data['perWilayah']   = $perWilayah;
-        $data['perKecamatan'] = $perKecamatan;
-        $data['arrDesa']      = $this->daftarDesa();
-        // Pilot HTMX: tabel Hasil Coklit dirender server-side sejak
-        // muat pertama; saringan & pagination berikutnya menukar
-        // potongan tabel lewat endpoint tabelPemilih().
-        $data['tpsAwal']      = $this->ambilDaftarTps('', 'semua');
-        $data['tabelAwal']    = $this->dataTabelPemilih([]);
-        $data['perlu']        = $this->hitungPerluDitangani();
-
-        return view('dashboard', $data);
     }
 
     /** Potongan tabel Hasil Coklit untuk HTMX (GET, tanpa muat ulang halaman). */
@@ -210,8 +236,7 @@ class Dashboard extends BaseController
 
     /**
      * Data satu halaman tabel Hasil Coklit (dipakai muat pertama dan
-     * endpoint HTMX). Saringan sama seperti getPemilih() versi
-     * DataTables; NIK/NKK Pemeriksa disamarkan.
+     * endpoint HTMX). NIK/NKK Pemeriksa disamarkan.
      *
      * @param array{desa?: string, tps?: string, tms?: string, lp?: string, hal?: int, perhal?: int} $param
      * @return array<string, mixed>
@@ -319,51 +344,4 @@ class Dashboard extends BaseController
         return $this->daftarTpsDari($desa, $sumber);
     }
 
-    public function getPemilih()
-    {
-        $db   = db_connect();
-        $desa = $this->request->getPost('desa');
-        $tps  = $this->request->getPost('tps');
-        $ket  = (string) $this->request->getPost('tms');
-        $lp   = $this->request->getPost('lp');
-
-        $builder = $db->table('mhc')
-            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
-            ->select('kelurahan.nama AS DESA, mhc.TPS, mhc.NKK, mhc.NIK, mhc.NAMA, mhc.TGLLHR, LEFT(mhc.LAST_UPDATE,10) AS LU, mhc.KET, mhc.JENIS_KELAMIN', false);
-        $this->saringWilayahId($builder);
-        if ($desa != '') {
-            // Pilihan desa datang sebagai nama; selesaikan ke master.
-            $kel = $db->table('kelurahan')->select('kelurahan.id AS id')
-                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
-                ->where('kelurahan.nama', $desa);
-            $kecId = \App\Libraries\Wilayah::kecEfektifId();
-            if ($kecId !== null) {
-                $kel->where('kelurahan.kecamatan_id', $kecId);
-            }
-            $kelRow = $kel->get()->getRowArray();
-            $builder->where('mhc.kelurahan_id', $kelRow !== null ? (int) $kelRow['id'] : -1);
-        }
-        if ($tps != '') {
-            $builder->where('mhc.TPS', $tps);
-        }
-        if ($lp != '') {
-            $builder->where('mhc.JENIS_KELAMIN', $lp);
-        }
-        if ($ket !== '') {
-            if (Keterangan::isMs($ket)) {
-                $builder->where('mhc.KET', $ket);
-            } elseif ($ket === 'MS') {
-                // Agregat seluruh pemilih memenuhi syarat (0/U/B).
-                $builder->whereIn('mhc.KET', Keterangan::MS);
-            } elseif ($ket === 'TMS') {
-                // Agregat seluruh pemilih tersaring (kode 1–8).
-                $builder->whereIn('mhc.KET', Keterangan::TMS);
-            }
-        }
-
-        return $this->samarkanUntukPemeriksa(
-            DataTable::of($builder)->addNumbering()->toJson(),
-            [3, 4]
-        );
-    }
 }

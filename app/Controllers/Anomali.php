@@ -2,7 +2,6 @@
 
 namespace App\Controllers;
 
-use \Hermawan\DataTables\DataTable;
 
 /**
  * Deteksi Anomali — tahap pertama (diminta AMWAL 10 Nov 2026):
@@ -82,6 +81,10 @@ class Anomali extends BaseController
      */
     private function pasanganTerselubung(): array
     {
+        // Cache analisis (optimasi 11 Nov 2026): hasil GROUP BY ini
+        // dipakai berulang (ringkasan, tabel, ekspor) dan hanya berubah
+        // bila data berubah.
+        return $this->ambilCacheAnalisis('anomali_pasangan', function () {
         $db = db_connect();
         [$sentuh, $bindings] = $this->sentuh();
         $ms = $this->daftarMs();
@@ -100,11 +103,13 @@ class Anomali extends BaseController
         }
 
         return $hasil;
+        });
     }
 
     /** NIK baris aktif yang termasuk pasangan terselubung tertentu. */
     private function nikTerselubung(array $pasangan): array
     {
+        return $this->ambilCacheAnalisis('anomali_niks_terselubung', function () use ($pasangan) {
         if ($pasangan === []) {
             return [];
         }
@@ -128,6 +133,7 @@ class Anomali extends BaseController
         }
 
         return $niks;
+        });
     }
 
     /** @return array{0: int, 1: int} [jumlah kelompok, jumlah baris] */
@@ -138,37 +144,6 @@ class Anomali extends BaseController
         return [count($pasangan), count($this->nikTerselubung($pasangan))];
     }
 
-    public function getTerselubung()
-    {
-        $db   = db_connect();
-        $niks = $this->nikTerselubung($this->pasanganTerselubung());
-
-        $builder = $db->table('mhc')
-            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
-            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
-            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.TGL_LAHIR, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET, mhc.SUMBER', false)
-            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
-            ->orderBy('mhc.NAMA', 'ASC')
-            ->orderBy('mhc.TGL_LAHIR', 'ASC')
-            ->orderBy('mhc.NIK', 'ASC');
-        if ($niks === []) {
-            $builder->where('1 = 0', null, false);
-        } else {
-            $builder->whereIn('mhc.NIK', $niks);
-        }
-
-        $label = \App\Libraries\Keterangan::daftar();
-        $json  = DataTable::of($builder)
-            ->addNumbering()
-            ->edit('TGL_LAHIR', static fn ($row) => date('d-m-Y', strtotime((string) $row->TGL_LAHIR)))
-            ->edit('KET', static fn ($row) => $label[(string) $row->KET] ?? (string) $row->KET)
-            ->toJson();
-
-        // Kolom: 0 No, 1 NIK, 2 NKK, 3 Nama, 4 Tgl Lahir, 5 L/P,
-        // 6 Kecamatan, 7 Desa, 8 TPS, 9 Keterangan, 10 Sumber.
-        return $this->samarkanUntukPemeriksa($json, [1, 2]);
-    }
-
     /**
      * Peta KK tersebar dalam cakupan pengguna: NKK => 'desa' | 'tps'.
      *
@@ -176,6 +151,7 @@ class Anomali extends BaseController
      */
     private function petaKkTersebar(): array
     {
+        return $this->ambilCacheAnalisis('anomali_peta_kk', function () {
         $db = db_connect();
         [$sentuh, $bindings] = $this->sentuh();
         $ms = $this->daftarMs();
@@ -196,47 +172,7 @@ class Anomali extends BaseController
         }
 
         return $peta;
-    }
-
-    public function getKkTersebar()
-    {
-        $db       = db_connect();
-        $peta     = $this->petaKkTersebar();
-        $kategori = (string) $this->request->getPost('kategori');
-
-        $nkks = [];
-        foreach ($peta as $nkk => $kat) {
-            if ($kategori === '' || $kat === $kategori) {
-                $nkks[] = $nkk;
-            }
-        }
-
-        $builder = $db->table('mhc')
-            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
-            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
-            ->select('mhc.NKK, mhc.NIK, mhc.NAMA, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
-            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
-            ->orderBy('mhc.NKK', 'ASC')
-            ->orderBy('KEC', 'ASC')
-            ->orderBy('DESA', 'ASC')
-            ->orderBy('mhc.TPS', 'ASC')
-            ->orderBy('mhc.NAMA', 'ASC');
-        if ($nkks === []) {
-            $builder->where('1 = 0', null, false);
-        } else {
-            $builder->whereIn('mhc.NKK', $nkks);
-        }
-
-        $label = \App\Libraries\Keterangan::daftar();
-        $json  = DataTable::of($builder)
-            ->addNumbering()
-            ->edit('KET', static fn ($row) => $label[(string) $row->KET] ?? (string) $row->KET)
-            ->add('KATEGORI', static fn ($row) => ($peta[$row->NKK] ?? 'tps') === 'desa' ? 'Antar Desa' : 'Beda TPS')
-            ->toJson();
-
-        // Kolom: 0 No, 1 NKK, 2 NIK, 3 Nama, 4 L/P, 5 Kecamatan,
-        // 6 Desa, 7 TPS, 8 Keterangan, 9 Kategori.
-        return $this->samarkanUntukPemeriksa($json, [1, 2]);
+        });
     }
 
     // ------------------------------------------------------------------
@@ -291,6 +227,7 @@ class Anomali extends BaseController
     /** @return array{0: int, 1: int} [jumlah atas-100, jumlah bawah-17] dalam cakupan baris pengguna. */
     private function hitungUmur(string $acuan): array
     {
+        return $this->ambilCacheAnalisis('anomali_umur', function () use ($acuan) {
         $db = db_connect();
         [$sentuh, $b] = $this->sentuh();
         $ms = $this->daftarMs();
@@ -308,48 +245,7 @@ class Anomali extends BaseController
         )->getRow()->j;
 
         return [$atas, $bawah];
-    }
-
-    public function getUmur()
-    {
-        $db       = db_connect();
-        $acuan    = $this->tanggalAcuan();
-        [$batas100, $batas17] = $this->batasUmur($acuan);
-        $kategori = (string) $this->request->getPost('kategori');
-
-        $kondisi = match ($kategori) {
-            'atas'  => "mhc.TGL_LAHIR < '{$batas100}'",
-            'bawah' => "(mhc.TGL_LAHIR > '{$batas17}' AND mhc.STATUS = 'B')",
-            default => "(mhc.TGL_LAHIR < '{$batas100}' OR (mhc.TGL_LAHIR > '{$batas17}' AND mhc.STATUS = 'B'))",
-        };
-
-        $builder = $db->table('mhc')
-            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
-            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
-            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.TGL_LAHIR, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
-            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
-            ->where($kondisi, null, false)
-            ->orderBy('mhc.TGL_LAHIR', 'ASC')
-            ->orderBy('mhc.NAMA', 'ASC');
-        \App\Libraries\Wilayah::saringId($builder);
-
-        $label = \App\Libraries\Keterangan::daftar();
-        $json  = DataTable::of($builder)
-            ->addNumbering()
-            ->edit('TGL_LAHIR', static fn ($row) => date('d-m-Y', strtotime((string) $row->TGL_LAHIR)))
-            ->edit('KET', static fn ($row) => $label[(string) $row->KET] ?? (string) $row->KET)
-            ->add('UMUR', static function ($row) use ($acuan) {
-                $umur = (new \DateTimeImmutable((string) $row->TGL_LAHIR))
-                    ->diff(new \DateTimeImmutable($acuan))->y;
-
-                return $umur . ' tahun';
-            })
-            ->add('KATEGORI', static fn ($row) => (string) $row->TGL_LAHIR < $batas100 ? 'Di Atas 100 Tahun' : 'Di Bawah 17 Tahun')
-            ->toJson();
-
-        // Kolom: 0 No, 1 NIK, 2 NKK, 3 Nama, 4 Tgl Lahir, 5 L/P,
-        // 6 Kecamatan, 7 Desa, 8 TPS, 9 Keterangan, 10 Umur, 11 Kategori.
-        return $this->samarkanUntukPemeriksa($json, [1, 2]);
+        }, true);
     }
 
     // -- Tabel HTMX (konversi dari DataTables, 10 Nov 2026) -------------
@@ -636,6 +532,7 @@ class Anomali extends BaseController
      */
     private function statistikNik(): array
     {
+        return $this->ambilCacheAnalisis('anomali_statistik_nik', function () {
         $db = db_connect();
         [$sentuh, $b] = $this->sentuh();
         $dd = $this->ekspresiHariNik('m');
@@ -677,6 +574,7 @@ class Anomali extends BaseController
             'bulan_beda' => (int) ($r->bulan_beda ?? 0),
             'tahun_beda' => (int) ($r->tahun_beda ?? 0),
         ];
+        });
     }
 
     /**
@@ -686,6 +584,7 @@ class Anomali extends BaseController
      */
     private function statistikPerKecamatan(): array
     {
+        return $this->ambilCacheAnalisis('anomali_statistik_kec', function () {
         $db = db_connect();
         [$sentuh, $b] = $this->sentuh();
         $dd = $this->ekspresiHariNik('m');
@@ -718,5 +617,6 @@ class Anomali extends BaseController
         }
 
         return $hasil;
+        });
     }
 }

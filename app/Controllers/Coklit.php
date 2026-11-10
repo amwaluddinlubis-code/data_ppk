@@ -188,6 +188,8 @@ class Coklit extends BaseController
             return redirect()->back()->withInput()->with('galat', 'Gagal menyimpan. Coba lagi.');
         }
 
+        $this->sentuhVersiData();
+
         return redirect()->to('coklit')->with('sukses', 'Pemilih ' . $bersih['NAMA'] . ' ditambahkan.');
     }
 
@@ -255,6 +257,8 @@ class Coklit extends BaseController
             return redirect()->back()->withInput()->with('galat', 'Gagal mengubah. Coba lagi.');
         }
 
+        $this->sentuhVersiData();
+
         return redirect()->to('coklit')->with('sukses', 'Pemilih ' . $bersih['NAMA'] . ' diperbarui.');
     }
 
@@ -280,6 +284,8 @@ class Coklit extends BaseController
         if (! $db->transStatus()) {
             return redirect()->back()->with('galat', 'Gagal menghapus. Coba lagi.');
         }
+
+        $this->sentuhVersiData();
 
         return redirect()->to('coklit')->with('sukses', 'Pemilih ' . $lama['NAMA'] . ' dihapus. Salinannya tersimpan di Riwayat Perubahan dan bisa dipulihkan.');
     }

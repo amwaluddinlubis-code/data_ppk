@@ -119,6 +119,8 @@ class Riwayat extends BaseController
             return redirect()->to('riwayat')->with('galat', 'Gagal memulihkan. Coba lagi.');
         }
 
+        $this->sentuhVersiData();
+
         return redirect()->to('riwayat')->with('sukses', 'Baris ' . ($baris['NAMA'] ?? '') . ' dipulihkan ke data coklit.');
     }
 }

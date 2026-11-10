@@ -38,11 +38,22 @@ class Pencarian extends BaseController
                 ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
                 ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.TGLLHR, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false);
             \App\Libraries\Wilayah::saringId($builder);
-            $builder->groupStart()
-                ->like('mhc.NAMA', $q)
-                ->orLike('mhc.NIK', $q)
-                ->orLike('mhc.NKK', $q)
-                ->groupEnd();
+            // Optimasi 11 Nov 2026: kata cari angka (NIK/NKK, minimal
+            // 6 digit) dicocokkan sebagai AWALAN pada NIK/NKK saja agar
+            // indeks terpakai — nama orang tidak memuat rangkaian angka
+            // seperti itu, jadi kolom NAMA tidak ikut dipindai.
+            if (ctype_digit($q) && strlen($q) >= 6) {
+                $builder->groupStart()
+                    ->like('mhc.NIK', $q, 'after')
+                    ->orLike('mhc.NKK', $q, 'after')
+                    ->groupEnd();
+            } else {
+                $builder->groupStart()
+                    ->like('mhc.NAMA', $q)
+                    ->orLike('mhc.NIK', $q)
+                    ->orLike('mhc.NKK', $q)
+                    ->groupEnd();
+            }
 
             $data['total'] = $builder->countAllResults(false);
             $rows = $builder

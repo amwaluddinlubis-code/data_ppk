@@ -44,7 +44,10 @@ class Laporan extends BaseController
         }
 
         // Agregat per desa dari mhc (satu kueri, wilayah lewat JOIN
-        // master) + KK dari view v_nkk
+        // master) + KK dari view v_nkk. Hasilnya disimpan di cache
+        // analisis (optimasi 11 Nov 2026) — pemindaian view v_nkk atas
+        // data kabupaten penuh adalah bagian termahal halaman ini.
+        $perDesa = $this->ambilCacheAnalisis('laporan_per_desa', function () use ($db) {
         $bDesa = $db->table('mhc')
             ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
             ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
@@ -69,12 +72,16 @@ class Laporan extends BaseController
         }
         unset($pd);
 
+        return $perDesa;
+        });
+
         // Rincian per TPS untuk desa terpilih
         $perTps = [];
         if ($desaDipilih !== '') {
             $master = new \App\Libraries\WilayahMaster($db);
             $kelIdDipilih = $kecDipilih !== null && $kecDipilih !== ''
                 ? $master->cariKelurahanId((string) $kecDipilih, $desaDipilih) : null;
+            $perTps = $this->ambilCacheAnalisis('laporan_per_tps_' . ($kelIdDipilih ?? -1), function () use ($db, $kelIdDipilih, $kecDipilih, $desaDipilih) {
             $perTps = $db->table('mhc')
                 ->select("TPS,
                     COUNT(*) AS total,
@@ -93,6 +100,9 @@ class Laporan extends BaseController
                 $pt['kk'] = $kkPerTps[$pt['TPS']] ?? 0;
             }
             unset($pt);
+
+            return $perTps;
+            });
         }
 
         return view('laporan/index', [

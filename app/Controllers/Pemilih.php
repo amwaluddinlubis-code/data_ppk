@@ -3,16 +3,17 @@
 namespace App\Controllers;
 
 use App\Models\PemilihModel;
-use \Hermawan\DataTables\DataTable;
 
 /**
  * Halaman-halaman daftar pemilih hasil coklit: Pindah TPS, Pemilih
  * Baru, Tersaring, daftar Aktif (siap cetak), dan cetak daftar MS
  * (HTML & PDF).
  *
- * Semua daftar memakai DataTables server-side di atas view basis data,
- * disaring wilayah efektif + saringan halaman (desa/TPS/jenis kelamin/
- * keterangan). NIK/NKK Pemeriksa disamarkan oleh BaseController.
+ * Semua daftar dirender server-side sebagai partial HTMX di atas
+ * view basis data, disaring wilayah efektif + saringan halaman
+ * (desa/TPS/jenis kelamin/keterangan). NIK/NKK Pemeriksa disamarkan
+ * oleh BaseController. (Umpan DataTables POST lama dicabut pada
+ * optimasi 11 Nov 2026.)
  *
  * Bangun ulang 2026: perakitan data halaman & persiapan cetak yang
  * dulu disalin di banyak metode kini terpusat di metode pembantu.
@@ -71,129 +72,10 @@ class Pemilih extends BaseController
         ];
     }
 
-    // -- Umpan DataTables ----------------------------------------------
-
-    public function pindahTPS()
-    {
-        $desa = $this->request->getPost('desa');
-        $tps  = $this->request->getPost('tps');
-        $lp   = $this->request->getPost('lp');
-        $stat = $this->request->getPost('stat');
-
-        $builder = db_connect()->table('pindahtps')->select('');
-        $this->saringWilayah($builder);
-        if ($desa != '') {
-            $builder->where('DESA', $desa);
-        }
-        if ($tps != '') {
-            $builder->where('TPS', $tps);
-        }
-        if ($lp != '') {
-            $builder->where('MSLP', $lp);
-        }
-        if ($stat != '') {
-            if ($stat == 1) {
-                $builder->where('MSTPS >', '1');
-            } else {
-                $builder->where('MSTPS IS NULL', null);
-            }
-        }
-
-        return $this->samarkanUntukPemeriksa(
-            DataTable::of($builder)->addNumbering()->toJson(),
-            [2, 3]
-        );
-    }
-
-    public function getPemilihBaru()
-    {
-        $desa = $this->request->getPost('desa');
-        $tps  = $this->request->getPost('tps');
-        $lp   = $this->request->getPost('lp');
-        $dp4  = $this->request->getPost('dp4');
-
-        $builder = db_connect()->table('pemilihbaru2')
-            ->select('DESA, TPS, NIK, NAMA, TGLLHR, JENIS_KELAMIN, OLD_NAMA');
-        $this->saringWilayah($builder);
-        if ($desa != '') {
-            $builder->where('DESA', $desa);
-        }
-        if ($tps != '') {
-            $builder->where('TPS', $tps);
-        }
-        if ($lp != '') {
-            $builder->where('JENIS_KELAMIN', $lp);
-        }
-        if ($dp4 != '') {
-            $builder->where($dp4 > 0 ? 'OLD_NAMA IS NOT NULL' : 'OLD_NAMA IS NULL', null);
-        }
-
-        return $this->samarkanUntukPemeriksa(
-            DataTable::of($builder)->addNumbering()->toJson(),
-            [3]
-        );
-    }
-
-    public function getPemilihTersaring()
-    {
-        $desa = $this->request->getPost('desa');
-        $tps  = $this->request->getPost('tps');
-        $lp   = $this->request->getPost('lp');
-        $ket  = $this->request->getPost('ket');
-
-        $builder = db_connect()->table('tersaring')
-            ->select('DESA, TPS, NIK, NAMA, TGLLHR, LP, KET');
-        $this->saringWilayah($builder);
-        if ($desa != '') {
-            $builder->where('DESA', $desa);
-        }
-        if ($tps != '') {
-            $builder->where('TPS', $tps);
-        }
-        if ($lp != '') {
-            $builder->where('LP', $lp);
-        }
-        if ($ket != '') {
-            $builder->where('KET', $ket);
-        }
-
-        return $this->samarkanUntukPemeriksa(
-            DataTable::of($builder)->addNumbering()->toJson(),
-            [3]
-        );
-    }
-
-    public function aktif()
-    {
-        $desa = $this->request->getPost('desa');
-        $tps  = $this->request->getPost('tps');
-        $lp   = $this->request->getPost('lp');
-
-        $builder = db_connect()->table('pemilih_active')
-            ->select('DESA, TPS, NKK, NIK, NAMA, TGLLHR, JK, UMUR, KET');
-        $this->saringWilayah($builder);
-        if ($desa != '') {
-            $builder->where('DESA', $desa);
-        }
-        if ($tps != '') {
-            $builder->where('TPS', $tps);
-        }
-        if ($lp != '') {
-            $builder->where('JK', $lp);
-        }
-
-        return $this->samarkanUntukPemeriksa(
-            DataTable::of($builder)->addNumbering()->toJson(),
-            [3, 4]
-        );
-    }
-
     // -- Tabel HTMX (konversi dari DataTables, 10 Nov 2026) -------------
     //
-    // Setiap halaman daftar kini dirender server-side sebagai partial
-    // dan ditukar lewat HTMX. Umpan DataTables POST di atas
-    // dipertahankan untuk kompatibilitas, tetapi tidak lagi dirujuk
-    // tampilan mana pun.
+    // Setiap halaman daftar dirender server-side sebagai partial
+    // dan ditukar lewat HTMX.
 
     /** Parameter bersama tabel HTMX dari query string. */
     private function paramTabel(array $ekstra = []): array
