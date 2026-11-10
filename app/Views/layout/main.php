@@ -49,6 +49,7 @@ $grupMenu[] = ['grup' => 'Data Pemilih', 'menu' => [
     'pemilih'            => ['label' => 'Pindah TPS', 'ikon' => 'fa-exchange-alt'],
     'pemilih/tersaring'  => ['label' => 'Tersaring (TMS)', 'ikon' => 'fa-filter'],
     'residu'             => ['label' => 'NIK Ganda', 'ikon' => 'fa-check-double'],
+    'anomali'            => ['label' => 'Deteksi Anomali', 'ikon' => 'fa-search-plus'],
 ]];
 if (in_array($penggunaLogin['peran'], ['admin', 'operator'], true)) {
     $grupMenu[] = ['grup' => 'Pengolahan', 'menu' => [

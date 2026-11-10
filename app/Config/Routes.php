@@ -84,4 +84,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('residu', 'Residu::index');
     $routes->post('residu/getGanda', 'Residu::getGanda');
     $routes->post('residu/getPeringatan', 'Residu::getPeringatan');
+    $routes->get('anomali', 'Anomali::index');
+    $routes->post('anomali/getTerselubung', 'Anomali::getTerselubung');
+    $routes->post('anomali/getKkTersebar', 'Anomali::getKkTersebar');
 });
