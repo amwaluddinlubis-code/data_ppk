@@ -46,6 +46,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     // Beranda: Daftar Hasil Coklit Pantarlih
     $routes->get('/', 'Dashboard::index');
     $routes->post('dashboard/getPemilih', 'Dashboard::getPemilih');
+    $routes->get('filter/tps', 'Dashboard::daftarTps');
 
     // Pemilih Pindah TPS
     $routes->get('pemilih', 'Pemilih::index');
@@ -87,4 +88,6 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('anomali', 'Anomali::index');
     $routes->post('anomali/getTerselubung', 'Anomali::getTerselubung');
     $routes->post('anomali/getKkTersebar', 'Anomali::getKkTersebar');
+    $routes->post('anomali/getUmur', 'Anomali::getUmur');
+    $routes->post('anomali/acuan', 'Anomali::simpanAcuan');
 });

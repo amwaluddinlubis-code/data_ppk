@@ -188,6 +188,19 @@ $grupMenu[] = ['grup' => 'Akun', 'menu' => [
     </div>
 </div>
 
+<!-- Modal konfirmasi bersama untuk tindakan penting -->
+<dialog id="modal-konfirmasi" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg" id="judul-konfirmasi">Konfirmasi</h3>
+        <p class="py-4 text-sm" id="pesan-konfirmasi"></p>
+        <div class="modal-action">
+            <button type="button" class="btn" id="batal-konfirmasi">Batal</button>
+            <button type="button" class="btn btn-error" id="tombol-konfirmasi">Ya, Lanjutkan</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>Tutup</button></form>
+</dialog>
+
 <!-- Navigasi bawah (khusus HP) -->
 <nav class="btm-nav btm-nav-sm lg:hidden bg-base-100 border-t border-base-300 z-30">
     <a href="<?= base_url('') ?>" class="<?= $kunciAktif === '' ? 'active text-primary' : '' ?>">
@@ -248,6 +261,69 @@ $.ajaxSetup({
         });
     }
 })();
+</script>
+<script>
+// Modal konfirmasi DaisyUI pengganti confirm() bawaan peramban.
+// Pemanggil memakai onsubmit="return mintaKonfirmasi(...)".
+var formKonfirmasi = null;
+function mintaKonfirmasi(form, judul, pesan, label, kelas) {
+    formKonfirmasi = form;
+    document.getElementById('judul-konfirmasi').textContent = judul;
+    document.getElementById('pesan-konfirmasi').textContent = pesan;
+    var tombol = document.getElementById('tombol-konfirmasi');
+    tombol.textContent = label || 'Ya, Lanjutkan';
+    tombol.className = 'btn ' + (kelas || 'btn-error');
+    document.getElementById('modal-konfirmasi').showModal();
+    return false;
+}
+document.getElementById('batal-konfirmasi').addEventListener('click', function () {
+    document.getElementById('modal-konfirmasi').close();
+    formKonfirmasi = null;
+});
+document.getElementById('tombol-konfirmasi').addEventListener('click', function () {
+    var form = formKonfirmasi;
+    formKonfirmasi = null;
+    document.getElementById('modal-konfirmasi').close();
+    if (form) form.submit();
+});
+
+// Pemberitahuan sukses biasa hilang sendiri; galat/info tetap tampil.
+setTimeout(function () {
+    document.querySelectorAll('.alert-success').forEach(function (el) {
+        el.style.transition = 'opacity 400ms ease';
+        el.style.opacity = '0';
+        setTimeout(function () { el.remove(); }, 450);
+    });
+}, 6000);
+</script>
+<script>
+// Filter TPS dinamis: isi pilihan #TPS dari nomor yang benar-benar
+// ada pada data halaman/desa aktif, bukan daftar tetap 1–5. Nomor
+// urut permintaan mencegah jawaban lama menimpa daftar desa terbaru
+// bila pengguna mengganti desa saat server sedang sibuk.
+var urutanMuatTps = 0;
+function muatDaftarTps(desa) {
+    var $tps = $('#TPS');
+    if (!$tps.length) return;
+    var sumber = $tps.data('sumber') || 'semua';
+    var urutan = ++urutanMuatTps;
+    $tps.prop('disabled', true);
+    $.getJSON("<?= base_url('filter/tps') ?>", { desa: desa || '', sumber: sumber })
+        .done(function (res) {
+            if (urutan !== urutanMuatTps) return;
+            $tps.empty().append('<option value="">PILIH TPS</option>');
+            (res.tps || []).forEach(function (nomor) {
+                $tps.append($('<option>').val(nomor).text('TPS ' + nomor));
+            });
+        })
+        .fail(function () {
+            if (urutan !== urutanMuatTps) return;
+            $tps.empty().append('<option value="">PILIH TPS</option>');
+        })
+        .always(function () {
+            if (urutan === urutanMuatTps) $tps.prop('disabled', false);
+        });
+}
 </script>
 <script>
 <?= $this->renderSection('javascript') ?>

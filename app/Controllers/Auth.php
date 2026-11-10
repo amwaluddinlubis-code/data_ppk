@@ -287,6 +287,19 @@ class Auth extends BaseController
         return redirect()->to('pengguna')->with('sukses', 'Status akun "' . $pengguna['username'] . '" diubah.');
     }
 
+    /** Kata sandi sementara acak kriptografis, dikelompokkan agar mudah disalin. */
+    private function buatSandiSementara(): string
+    {
+        $huruf = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+        $batas = strlen($huruf) - 1;
+        $mentah = '';
+        for ($i = 0; $i < 16; $i++) {
+            $mentah .= $huruf[random_int(0, $batas)];
+        }
+
+        return implode('-', str_split($mentah, 4));
+    }
+
     public function resetSandi($id = null)
     {
         if ($tolak = $this->wajibAdmin()) {
@@ -300,14 +313,22 @@ class Auth extends BaseController
             return redirect()->to('pengguna')->with('galat', 'Pengguna tidak ditemukan.');
         }
 
-        // Kata sandi sementara; pengguna dipaksa menggantinya saat masuk.
-        $sementara = 'ppk12345';
+        // Kata sandi sementara dibuat acak untuk setiap reset dan
+        // hanya diteruskan satu kali lewat flashdata ke panel khusus
+        // di halaman pengguna; tidak ada sandi bawaan yang sama untuk
+        // semua akun. Pengguna tetap dipaksa menggantinya saat masuk.
+        $sementara = $this->buatSandiSementara();
         $model->update($pengguna['id'], [
             'password_hash'     => UserModel::hashSandi($sementara),
             'harus_ganti_sandi' => 1,
         ]);
+        $this->catatAkses('reset_sandi', 'Reset sandi pengguna ' . $pengguna['username']);
 
         return redirect()->to('pengguna')
-            ->with('sukses', 'Kata sandi "' . $pengguna['username'] . '" direset menjadi "' . $sementara . '" — ia wajib menggantinya saat masuk.');
+            ->with('sukses', 'Kata sandi "' . $pengguna['username'] . '" sudah direset.')
+            ->with('sandi_reset', [
+                'username' => $pengguna['username'],
+                'sandi'    => $sementara,
+            ]);
     }
 }

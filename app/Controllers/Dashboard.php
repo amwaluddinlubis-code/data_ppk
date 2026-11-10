@@ -105,6 +105,69 @@ class Dashboard extends BaseController
         return view('dashboard', $data);
     }
 
+    /**
+     * Daftar nomor TPS yang benar-benar ada pada data, untuk filter
+     * dinamis di semua halaman daftar. Pilihan TPS tidak lagi dibatasi
+     * 1–5: isinya mengikuti desa dan cakupan pengguna yang masuk.
+     */
+    public function daftarTps()
+    {
+        $db     = db_connect();
+        $desa   = trim((string) $this->request->getGet('desa'));
+        $sumber = (string) $this->request->getGet('sumber');
+
+        // Halaman daftar memakai view yang berbeda-beda; TPS harus
+        // diambil dari view yang sama agar nomor yang ditawarkan
+        // benar-benar menghasilkan baris pada halaman itu.
+        $view = [
+            'aktif'    => 'pemilih_active',
+            'baru'     => 'pemilihbaru2',
+            'tersaring' => 'tersaring',
+            'pindah'   => 'pindahtps',
+        ][$sumber] ?? null;
+
+        if ($view !== null) {
+            $builder = $db->table($view)->distinct()->select('TPS');
+            $this->saringWilayah($builder);
+            if ($desa !== '') {
+                $builder->where('DESA', $desa);
+            }
+            $rows = $builder->orderBy('CAST(TPS AS UNSIGNED)', 'ASC', false)
+                ->get()->getResultArray();
+        } else {
+            $builder = $db->table('mhc')->distinct()->select('mhc.TPS')
+                ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id');
+            $this->saringWilayahId($builder);
+            if ($desa !== '') {
+                $kel = $db->table('kelurahan')->select('kelurahan.id AS id')
+                    ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+                    ->where('kelurahan.nama', $desa);
+                $kecId = \App\Libraries\Wilayah::kecEfektifId();
+                if ($kecId !== null) {
+                    $kel->where('kelurahan.kecamatan_id', $kecId);
+                }
+                $ids = array_map(
+                    static fn ($r) => (int) $r['id'],
+                    $kel->get()->getResultArray()
+                );
+                $builder->whereIn('mhc.kelurahan_id', $ids === [] ? [-1] : $ids);
+            }
+            $rows = $builder->orderBy('CAST(mhc.TPS AS UNSIGNED)', 'ASC', false)
+                ->get()->getResultArray();
+        }
+
+        $daftar = [];
+        foreach ($rows as $r) {
+            $tps = trim((string) ($r['TPS'] ?? ''));
+            if ($tps !== '') {
+                $daftar[] = $tps;
+            }
+        }
+
+        return $this->response->setJSON(['tps' => array_values(array_unique($daftar))]);
+    }
+
     public function getPemilih()
     {
         $db   = db_connect();
@@ -138,11 +201,11 @@ class Dashboard extends BaseController
         if ($ket !== '') {
             if (Keterangan::isMs($ket)) {
                 $builder->where('mhc.KET', $ket);
-            } elseif ($ket === 'TMS') {
-                // Nilai 'TMS' pada pilihan berarti "Pemilih Memenuhi Syarat"
-                // (warisan penamaan aplikasi asal; dipertahankan).
+            } elseif ($ket === 'MS') {
+                // Agregat seluruh pemilih memenuhi syarat (0/U/B).
                 $builder->whereIn('mhc.KET', Keterangan::MS);
-            } else {
+            } elseif ($ket === 'TMS') {
+                // Agregat seluruh pemilih tersaring (kode 1–8).
                 $builder->whereIn('mhc.KET', Keterangan::TMS);
             }
         }

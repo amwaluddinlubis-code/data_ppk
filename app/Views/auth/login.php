@@ -31,7 +31,7 @@
                 <div class="alert alert-info text-sm"><?= esc(session()->getFlashdata('info')) ?></div>
             <?php endif; ?>
 
-            <form method="post" action="<?= base_url('login') ?>" class="flex flex-col gap-3">
+            <form method="post" action="<?= base_url('login') ?>" class="flex flex-col gap-3" id="form-login">
                 <?= csrf_field() ?>
                 <label class="form-control w-full">
                     <span class="label-text font-semibold">Nama pengguna</span>
@@ -43,7 +43,7 @@
                     <input type="password" name="sandi" class="input input-bordered w-full"
                            required autocomplete="current-password">
                 </label>
-                <button type="submit" class="btn btn-primary w-full mt-1">Masuk</button>
+                <button type="submit" class="btn btn-primary w-full mt-1" id="tombol-masuk">Masuk</button>
             </form>
 
             <p class="text-xs opacity-60 text-center mt-2">
@@ -52,5 +52,12 @@
             </p>
         </div>
     </div>
+    <script>
+        document.getElementById('form-login').addEventListener('submit', function () {
+            var tombol = document.getElementById('tombol-masuk');
+            tombol.disabled = true;
+            tombol.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Memproses...';
+        });
+    </script>
 </body>
 </html>

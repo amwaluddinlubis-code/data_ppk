@@ -1,6 +1,17 @@
 <?= $this->extend('layout/main') ?>
 
 <?= $this->section('content') ?>
+<?php $sandiReset = session()->getFlashdata('sandi_reset'); ?>
+<?php if (is_array($sandiReset)) : ?>
+    <div class="alert alert-warning shadow-sm mb-4 text-sm block">
+        <div class="font-bold">Kata sandi sementara untuk <?= esc($sandiReset['username']) ?> — tampil hanya satu kali</div>
+        <div class="flex flex-wrap items-center gap-2 mt-2">
+            <code id="sandi-reset-sekali" class="bg-base-100 px-3 py-2 rounded font-bold text-base"><?= esc($sandiReset['sandi']) ?></code>
+            <button type="button" class="btn btn-sm" onclick="salinSandiReset(this)">Salin</button>
+        </div>
+        <p class="mt-2">Serahkan langsung kepada pengguna yang bersangkutan. Ia wajib menggantinya saat pertama masuk; sandi ini tidak ditampilkan lagi sesudah halaman ditinggalkan.</p>
+    </div>
+<?php endif; ?>
 <div class="grid gap-4 lg:grid-cols-5">
     <div class="card bg-base-100 shadow-sm lg:col-span-2">
         <div class="card-body">
@@ -85,9 +96,8 @@
                                         <?= (int) $p['aktif'] === 1 ? 'Nonaktifkan' : 'Aktifkan' ?>
                                     </button>
                                 </form>
-                                <form method="post" action="<?= base_url('pengguna/' . $p['id'] . '/reset-sandi') ?>" class="inline">
+                                <form method="post" action="<?= base_url('pengguna/' . $p['id'] . '/reset-sandi') ?>" class="inline" onsubmit="return mintaKonfirmasi(this, 'Reset Kata Sandi', 'Buat kata sandi sementara baru untuk <?= esc($p['username'], 'js') ?>? Sandi lama langsung tidak berlaku. Sandi baru hanya tampil satu kali sesudah reset.', 'Ya, Reset Sandi', 'btn-warning');">
                                     <?= csrf_field() ?>
-                                      onsubmit="return confirm('Reset kata sandi <?= esc($p['username'], 'js') ?> menjadi ppk12345?')">
                                     <button type="submit" class="btn btn-xs btn-ghost">Reset Sandi</button>
                                 </form>
                             </td>
@@ -96,7 +106,7 @@
                     </tbody>
                 </table>
             </div>
-            <p class="text-xs opacity-60 mt-2">Kata sandi hasil reset: <code>ppk12345</code> — pengguna dipaksa menggantinya saat masuk berikutnya.</p>
+            <p class="text-xs opacity-60 mt-2">Reset membuat kata sandi sementara <strong>acak yang berbeda untuk setiap akun</strong> dan hanya menampilkannya satu kali kepada admin.</p>
         </div>
     </div>
 </div>
@@ -104,6 +114,15 @@
 
 <?= $this->section('javascript') ?>
 <script>
+function salinSandiReset(tombol) {
+    var teks = document.getElementById('sandi-reset-sekali').textContent.trim();
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(teks).then(function () {
+            tombol.textContent = 'Tersalin';
+            setTimeout(function () { tombol.textContent = 'Salin'; }, 2000);
+        });
+    }
+}
 // Saring pilihan desa mengikuti kecamatan cakupan yang dipilih.
 (function () {
     var kec = document.getElementById('pilih-kecamatan');

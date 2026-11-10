@@ -15,11 +15,8 @@
             </label>
             <label class="form-control w-full sm:w-36">
                 <span class="label"><span class="label-text font-semibold">TPS</span></span>
-                <select class="select select-bordered select-sm" id="TPS">
+                <select class="select select-bordered select-sm" id="TPS" data-sumber="pindah">
                     <option value="">PILIH TPS</option>
-                    <?php for ($i = 1; $i <= 5; $i++) : ?>
-                        <option value="<?= $i ?>">TPS <?= $i ?></option>
-                    <?php endfor; ?>
                 </select>
             </label>
             <label class="form-control w-full sm:w-60">
@@ -109,6 +106,10 @@ function loadData() {
 }
 
 $(document).ready(function () {
+    muatDaftarTps($('#DESA').val());
+    $('#DESA').on('change', function () {
+        muatDaftarTps(this.value);
+    });
     loadData();
 });
 <?= $this->endSection() ?>

@@ -30,7 +30,10 @@ class Riwayat extends BaseController
 
         $aksi    = trim((string) $this->request->getGet('aksi'));
         $halaman = max(1, (int) $this->request->getGet('hal'));
-        $perHal  = 25;
+        $perHal  = (int) $this->request->getGet('perhal');
+        if (! in_array($perHal, [10, 25, 50, 100], true)) {
+            $perHal = 25;
+        }
 
         $model = new RiwayatModel();
         $builder = $model->builder();
@@ -43,7 +46,9 @@ class Riwayat extends BaseController
         if ($aksi !== '') {
             $builder->where('aksi', $aksi);
         }
-        $total = $builder->countAllResults(false);
+        $total    = $builder->countAllResults(false);
+        $totalHal = max(1, (int) ceil($total / $perHal));
+        $halaman  = min($halaman, $totalHal);
         $rows  = $builder->orderBy('id', 'DESC')->get($perHal, ($halaman - 1) * $perHal)->getResultArray();
 
         // Nama desa tampilan diselesaikan dari master (snapshot baris
@@ -66,7 +71,7 @@ class Riwayat extends BaseController
         $data['total']    = $total;
         $data['halaman']  = $halaman;
         $data['perHal']   = $perHal;
-        $data['totalHal'] = max(1, (int) ceil($total / $perHal));
+        $data['totalHal'] = $totalHal;
         $data['isAdmin']  = session()->get('pengguna_peran') === 'admin';
 
         return view('riwayat/index', $data);

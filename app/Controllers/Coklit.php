@@ -94,7 +94,10 @@ class Coklit extends BaseController
         $cakupan = $this->desaCakupan();
         $desa    = $cakupan ?? trim((string) $this->request->getGet('desa'));
         $halaman = max(1, (int) $this->request->getGet('hal'));
-        $perHal  = 25;
+        $perHal  = (int) $this->request->getGet('perhal');
+        if (! in_array($perHal, [10, 25, 50, 100], true)) {
+            $perHal = 25;
+        }
 
         $builder = $this->db()->table('mhc')
             ->select('mhc.*, kelurahan.nama AS DESA, kecamatan.nama AS KEC')
@@ -113,7 +116,9 @@ class Coklit extends BaseController
                 ->groupEnd();
         }
 
-        $total = $builder->countAllResults(false);
+        $total    = $builder->countAllResults(false);
+        $totalHal = max(1, (int) ceil($total / $perHal));
+        $halaman  = min($halaman, $totalHal);
         $rows  = $builder->orderBy('DESA', 'ASC')->orderBy('mhc.TPS', 'ASC')->orderBy('mhc.NAMA', 'ASC')
             ->get($perHal, ($halaman - 1) * $perHal)->getResultArray();
 
@@ -126,7 +131,7 @@ class Coklit extends BaseController
         $data['total']     = $total;
         $data['halaman']   = $halaman;
         $data['perHal']    = $perHal;
-        $data['totalHal']  = max(1, (int) ceil($total / $perHal));
+        $data['totalHal']  = $totalHal;
         $data['labelKet']  = \App\Libraries\Keterangan::daftar();
 
         return view('coklit/index', $data);
@@ -147,6 +152,9 @@ class Coklit extends BaseController
         $data['daftarDesa'] = $this->daftarDesa();
         $data['cakupan']    = $this->desaCakupan();
         $data['labelKet']   = \App\Libraries\Keterangan::daftar();
+        $data['daftarStatus'] = \App\Libraries\KodeBiodata::STATUS;
+        $data['daftarDisabilitas'] = \App\Libraries\KodeBiodata::DISABILITAS;
+        $data['daftarEktp'] = \App\Libraries\KodeBiodata::EKTP;
 
         return view('coklit/form', $data);
     }
@@ -209,6 +217,9 @@ class Coklit extends BaseController
         $data['daftarDesa'] = $this->daftarDesa();
         $data['cakupan']    = $this->desaCakupan();
         $data['labelKet']   = \App\Libraries\Keterangan::daftar();
+        $data['daftarStatus'] = \App\Libraries\KodeBiodata::STATUS;
+        $data['daftarDisabilitas'] = \App\Libraries\KodeBiodata::DISABILITAS;
+        $data['daftarEktp'] = \App\Libraries\KodeBiodata::EKTP;
 
         return view('coklit/form', $data);
     }
@@ -340,6 +351,39 @@ class Coklit extends BaseController
             }
         }
 
+        // Tanggal lahir dipilih lewat pemilih tanggal (ISO Y-m-d),
+        // lalu disimpan kembali dalam format data Sidalih DD|MM|YYYY
+        // agar kolom TGLLHR dan ekspor tidak berubah formatnya.
+        $tglPilih = $ambil('TGL_LAHIR_INPUT');
+        $tglLhr   = $ambil('TGLLHR');
+        if ($tglPilih !== '') {
+            $cekTgl = \DateTimeImmutable::createFromFormat('Y-m-d', $tglPilih);
+            if (! $cekTgl || $cekTgl->format('Y-m-d') !== $tglPilih) {
+                $galat[] = 'Tanggal lahir tidak sah.';
+            } else {
+                $tglLhr = $cekTgl->format('d|m|Y');
+            }
+        }
+        if ($tglLhr !== '' && \App\Libraries\ImporCoklit::tanggalLahirIso($tglLhr) === null) {
+            $galat[] = 'Tanggal lahir tidak sah.';
+        }
+
+        $status = strtoupper($ambil('STATUS'));
+        if ($status !== '' && ! isset(\App\Libraries\KodeBiodata::STATUS[$status])) {
+            $galat[] = 'Status perkawinan tidak dikenal.';
+        }
+
+        $disabilitas = $ambil('DISABILITAS');
+        if ($disabilitas !== '' && (! ctype_digit($disabilitas)
+            || ! isset(\App\Libraries\KodeBiodata::DISABILITAS[(int) $disabilitas]))) {
+            $galat[] = 'Kode disabilitas harus 0–6.';
+        }
+
+        $ektp = strtoupper($ambil('EKTP'));
+        if ($ektp !== '' && ! isset(\App\Libraries\KodeBiodata::EKTP[$ektp])) {
+            $galat[] = 'Status kepemilikan KTP-el harus S atau B.';
+        }
+
         $tglCoklit = $ambil('TGL_COKLIT');
 
         // Wilayah disimpan sebagai kelurahan_id (tabel master):
@@ -358,14 +402,14 @@ class Coklit extends BaseController
             'NKK'           => $nkk,
             'NAMA'          => strtoupper($nama),
             'TMPTLHR'       => $ambil('TMPTLHR'),
-            'TGLLHR'        => $ambil('TGLLHR'),
-            'STATUS'        => $ambil('STATUS'),
+            'TGLLHR'        => $tglLhr,
+            'STATUS'        => $status,
             'JENIS_KELAMIN' => $lp,
             'ALAMAT'        => $ambil('ALAMAT'),
             'RT'            => $ambil('RT'),
             'RW'            => $ambil('RW'),
-            'DISABILITAS'   => $ambil('DISABILITAS'),
-            'EKTP'          => $ambil('EKTP'),
+            'DISABILITAS'   => $disabilitas === '' ? null : (int) $disabilitas,
+            'EKTP'          => $ektp,
             'KET'           => $ket,
             'SUMBER'        => $ambil('SUMBER'),
             'TPS'           => $tps,

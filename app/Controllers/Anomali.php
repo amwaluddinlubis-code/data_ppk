@@ -38,6 +38,16 @@ class Anomali extends BaseController
         $data['jmlKk']          = count($petaKk);
         $data['jmlKkDesa']      = count(array_filter($petaKk, static fn ($k) => $k === 'desa'));
         $data['jmlKkTps']       = count(array_filter($petaKk, static fn ($k) => $k === 'tps'));
+
+        $acuan = $this->tanggalAcuan();
+        [$jmlAtas, $jmlBawah] = $this->hitungUmur($acuan);
+        $data['acuan']        = $acuan;
+        $data['acuanTampil']  = date('d-m-Y', strtotime($acuan));
+        $data['jmlAtas100']   = $jmlAtas;
+        $data['jmlBawah17']   = $jmlBawah;
+        $data['statNik']      = $this->statistikNik();
+        $data['statKecamatan'] = $this->statistikPerKecamatan();
+        $data['adalahAdmin']  = session()->get('pengguna_peran') === 'admin';
         return view('anomali', $data);
     }
 
@@ -224,5 +234,220 @@ class Anomali extends BaseController
         // Kolom: 0 No, 1 NKK, 2 NIK, 3 Nama, 4 L/P, 5 Kecamatan,
         // 6 Desa, 7 TPS, 8 Keterangan, 9 Kategori.
         return $this->samarkanUntukPemeriksa($json, [1, 2]);
+    }
+
+    // ------------------------------------------------------------------
+    // Tahap 2 (10 Nov 2026): Umur Ekstrem + Statistik Kesesuaian NIK
+    // ------------------------------------------------------------------
+
+    /**
+     * Tanggal hari pemungutan suara sebagai acuan umur, disimpan di
+     * tabel pengaturan (kunci 'tanggal_pemungutan'). Bawaan 2024-02-14
+     * (Pemilu 2024, sesuai data yang diimpor); admin dapat mengubahnya
+     * untuk tahapan berikutnya.
+     */
+    private function tanggalAcuan(): string
+    {
+        $baris = db_connect()->table('pengaturan')
+            ->getWhere(['kunci' => 'tanggal_pemungutan'])->getRow();
+        $tgl = $baris ? (string) $baris->nilai : '';
+        $cek = \DateTimeImmutable::createFromFormat('Y-m-d', $tgl);
+
+        return ($cek && $cek->format('Y-m-d') === $tgl) ? $tgl : '2024-02-14';
+    }
+
+    public function simpanAcuan()
+    {
+        if (session()->get('pengguna_peran') !== 'admin') {
+            return redirect()->to('anomali')
+                ->with('galat', 'Hanya admin kabupaten yang dapat mengubah tanggal acuan.');
+        }
+        $tgl = (string) $this->request->getPost('tanggal');
+        $cek = \DateTimeImmutable::createFromFormat('Y-m-d', $tgl);
+        if (! $cek || $cek->format('Y-m-d') !== $tgl) {
+            return redirect()->to('anomali')->with('galat', 'Tanggal acuan tidak sah.');
+        }
+        db_connect()->table('pengaturan')
+            ->replace(['kunci' => 'tanggal_pemungutan', 'nilai' => $tgl]);
+
+        return redirect()->to('anomali')
+            ->with('sukses', 'Tanggal acuan pemungutan diubah ke ' . $cek->format('d-m-Y') . '.');
+    }
+
+    /** @return array{0: string, 1: string} [batas lahir atas-100, batas lahir bawah-17] */
+    private function batasUmur(string $acuan): array
+    {
+        $dt = new \DateTimeImmutable($acuan);
+
+        return [
+            $dt->modify('-100 years')->format('Y-m-d'),
+            $dt->modify('-17 years')->format('Y-m-d'),
+        ];
+    }
+
+    /** @return array{0: int, 1: int} [jumlah atas-100, jumlah bawah-17] dalam cakupan baris pengguna. */
+    private function hitungUmur(string $acuan): array
+    {
+        $db = db_connect();
+        [$sentuh, $b] = $this->sentuh();
+        $ms = $this->daftarMs();
+        [$batas100, $batas17] = $this->batasUmur($acuan);
+
+        $dasar = 'FROM mhc m JOIN kelurahan kel ON kel.id = m.kelurahan_id '
+            . "WHERE m.KET IN ({$ms}) AND {$sentuh}";
+        $atas = (int) $db->query(
+            "SELECT COUNT(*) AS j {$dasar} AND m.TGL_LAHIR < ?",
+            array_merge($b, [$batas100])
+        )->getRow()->j;
+        $bawah = (int) $db->query(
+            "SELECT COUNT(*) AS j {$dasar} AND m.TGL_LAHIR > ? AND m.STATUS = 'B'",
+            array_merge($b, [$batas17])
+        )->getRow()->j;
+
+        return [$atas, $bawah];
+    }
+
+    public function getUmur()
+    {
+        $db       = db_connect();
+        $acuan    = $this->tanggalAcuan();
+        [$batas100, $batas17] = $this->batasUmur($acuan);
+        $kategori = (string) $this->request->getPost('kategori');
+
+        $kondisi = match ($kategori) {
+            'atas'  => "mhc.TGL_LAHIR < '{$batas100}'",
+            'bawah' => "(mhc.TGL_LAHIR > '{$batas17}' AND mhc.STATUS = 'B')",
+            default => "(mhc.TGL_LAHIR < '{$batas100}' OR (mhc.TGL_LAHIR > '{$batas17}' AND mhc.STATUS = 'B'))",
+        };
+
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.TGL_LAHIR, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
+            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
+            ->where($kondisi, null, false)
+            ->orderBy('mhc.TGL_LAHIR', 'ASC')
+            ->orderBy('mhc.NAMA', 'ASC');
+        \App\Libraries\Wilayah::saringId($builder);
+
+        $label = \App\Libraries\Keterangan::daftar();
+        $json  = DataTable::of($builder)
+            ->addNumbering()
+            ->edit('TGL_LAHIR', static fn ($row) => date('d-m-Y', strtotime((string) $row->TGL_LAHIR)))
+            ->edit('KET', static fn ($row) => $label[(string) $row->KET] ?? (string) $row->KET)
+            ->add('UMUR', static function ($row) use ($acuan) {
+                $umur = (new \DateTimeImmutable((string) $row->TGL_LAHIR))
+                    ->diff(new \DateTimeImmutable($acuan))->y;
+
+                return $umur . ' tahun';
+            })
+            ->add('KATEGORI', static fn ($row) => (string) $row->TGL_LAHIR < $batas100 ? 'Di Atas 100 Tahun' : 'Di Bawah 17 Tahun')
+            ->toJson();
+
+        // Kolom: 0 No, 1 NIK, 2 NKK, 3 Nama, 4 Tgl Lahir, 5 L/P,
+        // 6 Kecamatan, 7 Desa, 8 TPS, 9 Keterangan, 10 Umur, 11 Kategori.
+        return $this->samarkanUntukPemeriksa($json, [1, 2]);
+    }
+
+    /** Ekspresi SQL tanggal lahir (hari) yang terkode pada NIK, apa adanya. */
+    private function ekspresiHariNik(string $alias = 'm'): string
+    {
+        $hari = "CAST(SUBSTRING({$alias}.NIK, 7, 2) AS UNSIGNED)";
+
+        return "(CASE WHEN {$hari} > 40 THEN {$hari} - 40 ELSE {$hari} END)";
+    }
+
+    /**
+     * Statistik kesesuaian NIK atas SELURUH baris dalam cakupan
+     * pengguna. Ketidakcocokan tanggal bersifat massal (warisan data
+     * Dukcapil) sehingga disajikan sebagai statistik pemetaan, bukan
+     * daftar kerja per orang.
+     *
+     * @return array<string, int|float>
+     */
+    private function statistikNik(): array
+    {
+        $db = db_connect();
+        [$sentuh, $b] = $this->sentuh();
+        $dd = $this->ekspresiHariNik('m');
+        $sah = "m.NIK REGEXP '^[0-9]{16}$' AND m.TGL_LAHIR IS NOT NULL";
+
+        $sql = "SELECT
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN m.NIK NOT REGEXP '^[0-9]{16}$' THEN 1 ELSE 0 END) AS non16,
+                    SUM(CASE WHEN {$sah} THEN 1 ELSE 0 END) AS dinilai,
+                    SUM(CASE WHEN {$sah} AND (
+                        (CAST(SUBSTRING(m.NIK, 7, 2) AS UNSIGNED) NOT BETWEEN 1 AND 31
+                         AND CAST(SUBSTRING(m.NIK, 7, 2) AS UNSIGNED) NOT BETWEEN 41 AND 71)
+                        OR CAST(SUBSTRING(m.NIK, 9, 2) AS UNSIGNED) NOT BETWEEN 1 AND 12
+                    ) THEN 1 ELSE 0 END) AS kode_rusak,
+                    SUM(CASE WHEN {$sah} AND (
+                        {$dd} <> DAY(m.TGL_LAHIR)
+                        OR CAST(SUBSTRING(m.NIK, 9, 2) AS UNSIGNED) <> MONTH(m.TGL_LAHIR)
+                        OR CAST(SUBSTRING(m.NIK, 11, 2) AS UNSIGNED) <> (YEAR(m.TGL_LAHIR) MOD 100)
+                    ) THEN 1 ELSE 0 END) AS tgl_beda,
+                    SUM(CASE WHEN {$sah} AND {$dd} <> DAY(m.TGL_LAHIR) THEN 1 ELSE 0 END) AS hari_beda,
+                    SUM(CASE WHEN {$sah} AND CAST(SUBSTRING(m.NIK, 9, 2) AS UNSIGNED) <> MONTH(m.TGL_LAHIR) THEN 1 ELSE 0 END) AS bulan_beda,
+                    SUM(CASE WHEN {$sah} AND CAST(SUBSTRING(m.NIK, 11, 2) AS UNSIGNED) <> (YEAR(m.TGL_LAHIR) MOD 100) THEN 1 ELSE 0 END) AS tahun_beda
+                FROM mhc m
+                JOIN kelurahan kel ON kel.id = m.kelurahan_id
+                WHERE {$sentuh}";
+
+        $r = $db->query($sql, $b)->getRow();
+        $dinilai = (int) ($r->dinilai ?? 0);
+        $beda    = (int) ($r->tgl_beda ?? 0);
+
+        return [
+            'total'      => (int) ($r->total ?? 0),
+            'non16'      => (int) ($r->non16 ?? 0),
+            'dinilai'    => $dinilai,
+            'kode_rusak' => (int) ($r->kode_rusak ?? 0),
+            'tgl_beda'   => $beda,
+            'persen'     => $dinilai > 0 ? round($beda / $dinilai * 100, 1) : 0.0,
+            'hari_beda'  => (int) ($r->hari_beda ?? 0),
+            'bulan_beda' => (int) ($r->bulan_beda ?? 0),
+            'tahun_beda' => (int) ($r->tahun_beda ?? 0),
+        ];
+    }
+
+    /**
+     * Rincian statistik tanggal per kecamatan dalam cakupan pengguna.
+     *
+     * @return list<array{nama: string, dinilai: int, beda: int, persen: float}>
+     */
+    private function statistikPerKecamatan(): array
+    {
+        $db = db_connect();
+        [$sentuh, $b] = $this->sentuh();
+        $dd = $this->ekspresiHariNik('m');
+
+        $sql = "SELECT kec.nama AS nama,
+                    COUNT(*) AS dinilai,
+                    SUM(CASE WHEN
+                        {$dd} <> DAY(m.TGL_LAHIR)
+                        OR CAST(SUBSTRING(m.NIK, 9, 2) AS UNSIGNED) <> MONTH(m.TGL_LAHIR)
+                        OR CAST(SUBSTRING(m.NIK, 11, 2) AS UNSIGNED) <> (YEAR(m.TGL_LAHIR) MOD 100)
+                    THEN 1 ELSE 0 END) AS beda
+                FROM mhc m
+                JOIN kelurahan kel ON kel.id = m.kelurahan_id
+                JOIN kecamatan kec ON kec.id = kel.kecamatan_id
+                WHERE {$sentuh}
+                  AND m.NIK REGEXP '^[0-9]{16}$' AND m.TGL_LAHIR IS NOT NULL
+                GROUP BY kec.nama
+                ORDER BY kec.nama ASC";
+
+        $hasil = [];
+        foreach ($db->query($sql, $b)->getResult() as $baris) {
+            $dinilai = (int) $baris->dinilai;
+            $beda    = (int) $baris->beda;
+            $hasil[] = [
+                'nama'    => (string) $baris->nama,
+                'dinilai' => $dinilai,
+                'beda'    => $beda,
+                'persen'  => $dinilai > 0 ? round($beda / $dinilai * 100, 1) : 0.0,
+            ];
+        }
+
+        return $hasil;
     }
 }

@@ -54,7 +54,7 @@
                             <td><?= esc($r['pengguna_username']) ?></td>
                             <td class="text-right">
                                 <?php if ($r['aksi'] === 'hapus' && $isAdmin) : ?>
-                                    <form method="post" action="<?= base_url('riwayat/pulih/' . $r['id']) ?>" onsubmit="return confirm('Pulihkan baris ini ke data coklit?');">
+                                    <form method="post" action="<?= base_url('riwayat/pulih/' . $r['id']) ?>" onsubmit="return mintaKonfirmasi(this, 'Pulihkan Baris', 'Pulihkan baris <?= esc($r['nama_tampil'], 'js') ?> ke data coklit?', 'Ya, Pulihkan', 'btn-warning');">
                                         <?= csrf_field() ?>
                                         <button type="submit" class="btn btn-warning btn-xs"><i class="fas fa-undo"></i> PULIHKAN</button>
                                     </form>
@@ -66,15 +66,14 @@
             </table>
         </div>
 
-        <div class="flex items-center gap-2 mt-4">
-            <?php if ($halaman > 1) : ?>
-                <a href="<?= base_url('riwayat') . '?' . http_build_query(array_filter(['aksi' => $aksi, 'hal' => $halaman - 1])) ?>" class="btn btn-sm">« Sebelumnya</a>
-            <?php endif; ?>
-            <span class="text-sm">Halaman <?= $halaman ?> dari <?= $totalHal ?></span>
-            <?php if ($halaman < $totalHal) : ?>
-                <a href="<?= base_url('riwayat') . '?' . http_build_query(array_filter(['aksi' => $aksi, 'hal' => $halaman + 1])) ?>" class="btn btn-sm">Berikutnya »</a>
-            <?php endif; ?>
-        </div>
+        <?= view('layout/pagination', [
+            'basisUrl' => base_url('riwayat'),
+            'paramPagination' => ['aksi' => $aksi],
+            'halaman' => $halaman,
+            'totalHal' => $totalHal,
+            'total' => $total,
+            'perHal' => $perHal,
+        ]) ?>
     </div>
 </div>
 <?= $this->endSection() ?>

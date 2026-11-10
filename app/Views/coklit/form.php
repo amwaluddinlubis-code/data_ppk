@@ -8,6 +8,8 @@ $nilai = static function (string $k) use ($lamaInput, $baris) {
 };
 $isEdit = $baris !== null;
 $aksiForm = $isEdit ? base_url('coklit/update/' . $baris['ID']) : base_url('coklit/simpan');
+$tglLahirInput = (string) ($lamaInput['TGL_LAHIR_INPUT']
+    ?? (\App\Libraries\ImporCoklit::tanggalLahirIso($baris['TGLLHR'] ?? null) ?? ''));
 ?>
 <?php if (session()->getFlashdata('galat')) : ?>
     <div class="alert alert-error shadow-sm mb-4 text-sm"><?= esc(session()->getFlashdata('galat')) ?></div>
@@ -38,13 +40,17 @@ $aksiForm = $isEdit ? base_url('coklit/update/' . $baris['ID']) : base_url('cokl
                 </label>
                 <label class="form-control">
                     <span class="label"><span class="label-text font-semibold">TANGGAL LAHIR</span></span>
-                    <input type="text" name="TGLLHR" value="<?= esc($nilai('TGLLHR'), 'attr') ?>" class="input input-bordered input-sm" placeholder="cth: 31|12|1968">
-                    <span class="label"><span class="label-text-alt opacity-60">Ikuti format data yang ada (DD|MM|YYYY)</span></span>
+                    <input type="date" name="TGL_LAHIR_INPUT" value="<?= esc($tglLahirInput, 'attr') ?>" class="input input-bordered input-sm">
+                    <span class="label"><span class="label-text-alt opacity-60">Dipilih dari kalender; tersimpan tetap dalam format data Sidalih.</span></span>
                 </label>
                 <label class="form-control">
-                    <span class="label"><span class="label-text font-semibold">STATUS PERKAWINAN (KODE)</span></span>
-                    <input type="text" name="STATUS" value="<?= esc($nilai('STATUS'), 'attr') ?>" maxlength="2" class="input input-bordered input-sm">
-                    <span class="label"><span class="label-text-alt opacity-60">Kode sesuai data coklit (B / S / P)</span></span>
+                    <span class="label"><span class="label-text font-semibold">STATUS PERKAWINAN</span></span>
+                    <select name="STATUS" class="select select-bordered select-sm">
+                        <option value="">— Belum diisi —</option>
+                        <?php foreach ($daftarStatus as $kode => $label) : ?>
+                            <option value="<?= esc($kode, 'attr') ?>" <?= (string) $nilai('STATUS') === (string) $kode ? 'selected' : '' ?>><?= esc($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </label>
                 <label class="form-control">
                     <span class="label"><span class="label-text font-semibold">JENIS KELAMIN *</span></span>
@@ -116,12 +122,22 @@ $aksiForm = $isEdit ? base_url('coklit/update/' . $baris['ID']) : base_url('cokl
                     </datalist>
                 </label>
                 <label class="form-control">
-                    <span class="label"><span class="label-text font-semibold">DISABILITAS (KODE)</span></span>
-                    <input type="text" name="DISABILITAS" value="<?= esc($nilai('DISABILITAS'), 'attr') ?>" class="input input-bordered input-sm">
+                    <span class="label"><span class="label-text font-semibold">DISABILITAS</span></span>
+                    <select name="DISABILITAS" class="select select-bordered select-sm">
+                        <option value="">— Belum diisi —</option>
+                        <?php foreach ($daftarDisabilitas as $kode => $label) : ?>
+                            <option value="<?= esc($kode, 'attr') ?>" <?= (string) $nilai('DISABILITAS') === (string) $kode ? 'selected' : '' ?>><?= esc($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </label>
                 <label class="form-control">
-                    <span class="label"><span class="label-text font-semibold">E-KTP (KODE)</span></span>
-                    <input type="text" name="EKTP" value="<?= esc($nilai('EKTP'), 'attr') ?>" maxlength="2" class="input input-bordered input-sm">
+                    <span class="label"><span class="label-text font-semibold">KEPEMILIKAN KTP-EL</span></span>
+                    <select name="EKTP" class="select select-bordered select-sm">
+                        <option value="">— Belum diisi —</option>
+                        <?php foreach ($daftarEktp as $kode => $label) : ?>
+                            <option value="<?= esc($kode, 'attr') ?>" <?= (string) $nilai('EKTP') === (string) $kode ? 'selected' : '' ?>><?= esc($label) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </label>
                 <label class="form-control">
                     <span class="label"><span class="label-text font-semibold">TANGGAL COKLIT</span></span>

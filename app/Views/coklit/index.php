@@ -67,7 +67,7 @@
                             <td><?= esc($r['JENIS_KELAMIN']) ?></td>
                             <td class="text-right whitespace-nowrap">
                                 <a href="<?= base_url('coklit/edit/' . $r['ID']) ?>" class="btn btn-primary btn-xs"><i class="fas fa-edit"></i> UBAH</a>
-                                <form method="post" action="<?= base_url('coklit/hapus/' . $r['ID']) ?>" class="inline" onsubmit="return confirm('Hapus baris <?= esc($r['NAMA'], 'js') ?>? Salinannya tetap tersimpan di Riwayat dan bisa dipulihkan Admin.');">
+                                <form method="post" action="<?= base_url('coklit/hapus/' . $r['ID']) ?>" class="inline" onsubmit="return mintaKonfirmasi(this, 'Hapus Pemilih', 'Hapus baris <?= esc($r['NAMA'], 'js') ?>? Salinannya tetap tersimpan di Riwayat Perubahan dan bisa dipulihkan Admin.', 'Ya, Hapus', 'btn-error');">
                                     <?= csrf_field() ?>
                                     <button type="submit" class="btn btn-error btn-xs"><i class="fas fa-trash"></i> HAPUS</button>
                                 </form>
@@ -78,21 +78,14 @@
             </table>
         </div>
 
-        <div class="flex items-center gap-2 mt-4">
-            <?php
-            $tautan = static function (int $h) use ($q, $desa): string {
-                $params = array_filter(['q' => $q, 'desa' => $desa, 'hal' => $h], static fn ($v) => $v !== '' && $v !== null);
-                return base_url('coklit') . '?' . http_build_query($params);
-            };
-            ?>
-            <?php if ($halaman > 1) : ?>
-                <a href="<?= $tautan($halaman - 1) ?>" class="btn btn-sm">« Sebelumnya</a>
-            <?php endif; ?>
-            <span class="text-sm">Halaman <?= $halaman ?> dari <?= $totalHal ?></span>
-            <?php if ($halaman < $totalHal) : ?>
-                <a href="<?= $tautan($halaman + 1) ?>" class="btn btn-sm">Berikutnya »</a>
-            <?php endif; ?>
-        </div>
+        <?= view('layout/pagination', [
+            'basisUrl' => base_url('coklit'),
+            'paramPagination' => ['q' => $q, 'desa' => $desa],
+            'halaman' => $halaman,
+            'totalHal' => $totalHal,
+            'total' => $total,
+            'perHal' => $perHal,
+        ]) ?>
     </div>
 </div>
 <?= $this->endSection() ?>
