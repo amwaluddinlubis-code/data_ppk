@@ -193,6 +193,55 @@ abstract class BaseController extends Controller
     }
 
     /**
+     * Kirim unduhan ekspor tabel sebagai CSV atau XLSX (Paket Menengah).
+     * $judul = label kolom; $baris = baris nilai sesuai urutan $judul.
+     * Penyamaran untuk Pemeriksa dilakukan pemanggil sebelumnya lewat
+     * samarkanBarisPemeriksa().
+     *
+     * @param list<string>              $judul
+     * @param list<list<mixed>>         $baris
+     */
+    protected function kirimEkspor(array $judul, array $baris, string $namaDasar, string $format)
+    {
+        $nama = $namaDasar . '-' . date('Ymd-His');
+
+        if ($format === 'xlsx') {
+            $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+            $sheet       = $spreadsheet->getActiveSheet();
+            $sheet->fromArray($judul, null, 'A1');
+            $sheet->fromArray($baris, null, 'A2');
+            $sheet->getStyle('A1:' . $sheet->getHighestColumn() . '1')->getFont()->setBold(true);
+            foreach (range('A', $sheet->getHighestColumn()) as $kol) {
+                $sheet->getColumnDimension($kol)->setAutoSize(true);
+            }
+            $path = tempnam((new \Config\Paths())->writableDirectory, 'ekspor_');
+            (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+            $isi = (string) file_get_contents($path);
+            unlink($path);
+
+            return $this->response
+                ->setContentType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                ->setHeader('Content-Disposition', 'attachment; filename="' . $nama . '.xlsx"')
+                ->setBody($isi);
+        }
+
+        $alir = fopen('php://temp', 'r+b');
+        fwrite($alir, "\xEF\xBB\xBF"); // BOM agar Excel membaca UTF-8 dengan benar
+        fputcsv($alir, $judul, ';');
+        foreach ($baris as $b) {
+            fputcsv($alir, $b, ';');
+        }
+        rewind($alir);
+        $isi = (string) stream_get_contents($alir);
+        fclose($alir);
+
+        return $this->response
+            ->setContentType('text/csv; charset=UTF-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . $nama . '.csv"')
+            ->setBody($isi);
+    }
+
+    /**
      * Samarkan kolom-kolom sensitif pada baris hasil bila peran yang
      * masuk adalah Pemeriksa (padanan samarkanUntukPemeriksa untuk
      * keluaran partial HTMX berbentuk larik).

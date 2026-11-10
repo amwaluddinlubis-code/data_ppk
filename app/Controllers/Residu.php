@@ -267,6 +267,76 @@ class Residu extends BaseController
         ]));
     }
 
+    // -- Ekspor (Paket Menengah) ------------------------------------------
+
+    public function eksporGanda()
+    {
+        $format = $this->request->getGet('format') === 'xlsx' ? 'xlsx' : 'csv';
+        $semua  = $this->dataGandaSemua(trim((string) $this->request->getGet('kategori')));
+        $baris = [];
+        foreach ($semua as $i => $r) {
+            $baris[] = [$i + 1, $r['NIK'], $r['NKK'], $r['NAMA'], $r['JENIS_KELAMIN'], $r['KEC'], $r['DESA'], $r['TPS'], $r['KET_LABEL'], $r['SUMBER'], $r['KATEGORI']];
+        }
+        $this->catatAkses('ekspor_nik_ganda', count($baris) . ' baris (' . $format . ')');
+
+        return $this->kirimEkspor(['NO', 'NIK', 'NKK', 'NAMA', 'L/P', 'KECAMATAN', 'DESA', 'TPS', 'KETERANGAN', 'SUMBER', 'KATEGORI'], $baris, 'nik-ganda', $format);
+    }
+
+    /** Seluruh baris NIK ganda untuk ekspor (tanpa pagination). */
+    private function dataGandaSemua(string $kategori): array
+    {
+        $db   = db_connect();
+        $peta = $this->petaGanda();
+        $niks = [];
+        foreach ($peta as $nik => $kat) {
+            if ($kategori === '' || $kat === $kategori) {
+                $niks[] = $nik;
+            }
+        }
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET, mhc.SUMBER', false)
+            ->orderBy('mhc.NIK', 'ASC')->orderBy('KEC', 'ASC')->orderBy('DESA', 'ASC')->orderBy('mhc.TPS', 'ASC');
+        if ($niks === []) {
+            $builder->where('1 = 0', null, false);
+        } else {
+            $builder->whereIn('NIK', $niks);
+        }
+        $rows  = $builder->get()->getResultArray();
+        $label = \App\Libraries\Keterangan::daftar();
+        foreach ($rows as &$r) {
+            $r['KET_LABEL'] = $label[(string) $r['KET']] ?? (string) $r['KET'];
+            $r['KATEGORI']  = ($peta[$r['NIK']] ?? 'desa') === 'kecamatan' ? 'Antar Kecamatan' : 'Antar Desa';
+        }
+        unset($r);
+
+        return $this->samarkanBarisPemeriksa($rows, ['NIK', 'NKK']);
+    }
+
+    public function eksporPeringatan()
+    {
+        $format = $this->request->getGet('format') === 'xlsx' ? 'xlsx' : 'csv';
+        $db     = db_connect();
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
+            ->where($this->kondisiGender('mhc'), null, false)
+            ->orderBy('KEC', 'ASC')->orderBy('DESA', 'ASC')->orderBy('mhc.NAMA', 'ASC');
+        \App\Libraries\Wilayah::saringId($builder);
+        $rows  = $this->samarkanBarisPemeriksa($builder->get()->getResultArray(), ['NIK', 'NKK']);
+        $label = \App\Libraries\Keterangan::daftar();
+        $jk    = ['L' => 'Laki-laki', 'P' => 'Perempuan'];
+        $baris = [];
+        foreach ($rows as $i => $r) {
+            $baris[] = [$i + 1, $r['NIK'], $r['NKK'], $r['NAMA'], $jk[(string) $r['JENIS_KELAMIN']] ?? $r['JENIS_KELAMIN'], ((int) substr((string) $r['NIK'], 6, 2)) > 40 ? 'Perempuan' : 'Laki-laki', $r['KEC'], $r['DESA'], $r['TPS'], $label[(string) $r['KET']] ?? $r['KET'], 'Peringatan'];
+        }
+        $this->catatAkses('ekspor_peringatan_jk', count($baris) . ' baris (' . $format . ')');
+
+        return $this->kirimEkspor(['NO', 'NIK', 'NKK', 'NAMA', 'TERCATAT', 'MENURUT NIK', 'KECAMATAN', 'DESA', 'TPS', 'KETERANGAN', 'TANDA'], $baris, 'peringatan-jk-nik', $format);
+    }
+
     /**
      * Peta NIK ganda antar wilayah yang menyentuh cakupan pengguna:
      * NIK => 'kecamatan' | 'desa'. Klasifikasi dihitung dari seluruh

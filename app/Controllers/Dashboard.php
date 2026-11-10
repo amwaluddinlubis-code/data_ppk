@@ -106,11 +106,94 @@ class Dashboard extends BaseController
         // potongan tabel lewat endpoint tabelPemilih().
         $data['tpsAwal']      = $this->ambilDaftarTps('', 'semua');
         $data['tabelAwal']    = $this->dataTabelPemilih([]);
+        $data['perlu']        = $this->hitungPerluDitangani();
 
         return view('dashboard', $data);
     }
 
     /** Potongan tabel Hasil Coklit untuk HTMX (GET, tanpa muat ulang halaman). */
+    /**
+     * Angka "Perlu Ditangani" untuk kartu tugas di dasbor (Paket
+     * Menengah): jumlah kelompok NIK ganda, baris peringatan JK, dan
+     * kelompok anomali dalam cakupan pengguna. Kuerinya meniru modul
+     * Residu dan Anomali (pola "menyentuh wilayah"), tetapi hanya
+     * menghitung — rincian tetap dikerjakan di modul masing-masing.
+     *
+     * @return array{ganda: int, peringatan: int, terselubung: int, kk: int, umur: int}
+     */
+    private function hitungPerluDitangani(): array
+    {
+        $db    = db_connect();
+        $kelId = \App\Libraries\Wilayah::kelurahanIdPengguna();
+        $kecId = \App\Libraries\Wilayah::kecEfektifId();
+        $sentuh = '1 = 1';
+        $ikat   = [];
+        if ($kelId !== null) {
+            $sentuh = 'm.kelurahan_id = ?';
+            $ikat   = [$kelId];
+        } elseif ($kecId !== null) {
+            $sentuh = 'kel.kecamatan_id = ?';
+            $ikat   = [$kecId];
+        }
+        $gabung = 'FROM mhc m JOIN kelurahan kel ON kel.id = m.kelurahan_id ';
+        $sentuhSum = "SUM(CASE WHEN {$sentuh} THEN 1 ELSE 0 END) > 0";
+
+        $ganda = (int) $db->query(
+            "SELECT COUNT(*) AS j FROM (SELECT m.NIK {$gabung} "
+            . "GROUP BY m.NIK HAVING (COUNT(DISTINCT kel.kecamatan_id) > 1 "
+            . "OR COUNT(DISTINCT m.kelurahan_id) > 1) AND {$sentuhSum}) t",
+            $ikat
+        )->getRow()->j;
+
+        $hari = "CAST(SUBSTRING(m.NIK, 7, 2) AS UNSIGNED)";
+        $kondisiGender = "(m.NIK REGEXP '^[0-9]{16}$' AND ("
+            . "({$hari} BETWEEN 1 AND 31 AND m.JENIS_KELAMIN = 'P') OR "
+            . "({$hari} BETWEEN 41 AND 71 AND m.JENIS_KELAMIN = 'L')))";
+        $peringatan = (int) $db->query(
+            "SELECT COUNT(*) AS j {$gabung} WHERE {$kondisiGender} AND {$sentuh}",
+            $ikat
+        )->getRow()->j;
+
+        $ms = Keterangan::sqlMs();
+        $terselubung = (int) $db->query(
+            "SELECT COUNT(*) AS j FROM (SELECT m.NAMA {$gabung} "
+            . "WHERE m.KET IN ({$ms}) AND m.TGL_LAHIR IS NOT NULL "
+            . "GROUP BY m.NAMA, m.TGL_LAHIR HAVING COUNT(DISTINCT m.NIK) > 1 AND {$sentuhSum}) t",
+            $ikat
+        )->getRow()->j;
+
+        $kk = (int) $db->query(
+            "SELECT COUNT(*) AS j FROM (SELECT m.NKK {$gabung} "
+            . "WHERE m.KET IN ({$ms}) AND m.NKK IS NOT NULL AND m.NKK <> '' AND m.NKK <> '0' "
+            . "GROUP BY m.NKK HAVING COUNT(DISTINCT CONCAT(m.kelurahan_id, '-', m.TPS)) > 1 AND {$sentuhSum}) t",
+            $ikat
+        )->getRow()->j;
+
+        $barisAcuan = $db->table('pengaturan')->getWhere(['kunci' => 'tanggal_pemungutan'])->getRow();
+        $tgl = $barisAcuan ? (string) $barisAcuan->nilai : '';
+        $cek = \DateTimeImmutable::createFromFormat('Y-m-d', $tgl);
+        $acuan = ($cek && $cek->format('Y-m-d') === $tgl) ? $tgl : '2024-02-14';
+        $dt = new \DateTimeImmutable($acuan);
+        $batas100 = $dt->modify('-100 years')->format('Y-m-d');
+        $batas17  = $dt->modify('-17 years')->format('Y-m-d');
+        $atas = (int) $db->query(
+            "SELECT COUNT(*) AS j {$gabung} WHERE m.KET IN ({$ms}) AND {$sentuh} AND m.TGL_LAHIR < ?",
+            array_merge($ikat, [$batas100])
+        )->getRow()->j;
+        $bawah = (int) $db->query(
+            "SELECT COUNT(*) AS j {$gabung} WHERE m.KET IN ({$ms}) AND {$sentuh} AND m.TGL_LAHIR > ? AND m.STATUS = 'B'",
+            array_merge($ikat, [$batas17])
+        )->getRow()->j;
+
+        return [
+            'ganda'      => $ganda,
+            'peringatan' => $peringatan,
+            'terselubung' => $terselubung,
+            'kk'         => $kk,
+            'umur'       => $atas + $bawah,
+        ];
+    }
+
     public function tabelPemilih()
     {
         $param = [

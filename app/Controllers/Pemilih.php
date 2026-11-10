@@ -416,6 +416,136 @@ class Pemilih extends BaseController
         return view('pemilih/_tabel_pindah', $this->dataPindah($this->paramTabel(['stat'])));
     }
 
+    // -- Ekspor (Paket Menengah) -----------------------------------------
+    //
+    // Unduhan CSV/XLSX mengikuti saringan halaman yang sedang aktif dan
+    // cakupan wilayah pengguna; NIK/NKK Pemeriksa tersamar; setiap
+    // ekspor tercatat di log akses.
+
+    public function eksporAktif()
+    {
+        $p = $this->paramTabel();
+        $builder = db_connect()->table('pemilih_active')
+            ->select('DESA, TPS, NKK, NIK, NAMA, TGLLHR, JK, UMUR, KET');
+        $this->saringWilayah($builder);
+        if ($p['desa'] !== '') {
+            $builder->where('DESA', $p['desa']);
+        }
+        if ($p['tps'] !== '') {
+            $builder->where('TPS', $p['tps']);
+        }
+        if ($p['lp'] !== '') {
+            $builder->where('JK', $p['lp']);
+        }
+        $builder->orderBy('DESA', 'ASC')->orderBy('CAST(TPS AS UNSIGNED)', 'ASC', false)->orderBy('NAMA', 'ASC');
+        $rows = $this->samarkanBarisPemeriksa($builder->get()->getResultArray(), ['NKK', 'NIK']);
+        $label = \App\Libraries\Keterangan::daftar();
+        $baris = [];
+        foreach ($rows as $i => $r) {
+            $baris[] = [$i + 1, $r['DESA'], $r['TPS'], $r['NKK'], $r['NIK'], $r['NAMA'], $r['TGLLHR'], $r['JK'], $r['UMUR'], $label[(string) $r['KET']] ?? $r['KET']];
+        }
+        $this->catatAkses('ekspor_pemilih_aktif', count($baris) . ' baris (' . $this->formatEkspor() . ')');
+
+        return $this->kirimEkspor(['NO', 'DESA', 'TPS', 'NKK', 'NIK', 'NAMA', 'TGL LAHIR', 'L/P', 'UMUR', 'KETERANGAN'], $baris, 'pemilih-aktif', $this->formatEkspor());
+    }
+
+    public function eksporBaru()
+    {
+        $p = $this->paramTabel(['dp4']);
+        $builder = db_connect()->table('pemilihbaru2')
+            ->select('DESA, TPS, NIK, NAMA, TGLLHR, JENIS_KELAMIN, OLD_NAMA');
+        $this->saringWilayah($builder);
+        if ($p['desa'] !== '') {
+            $builder->where('DESA', $p['desa']);
+        }
+        if ($p['tps'] !== '') {
+            $builder->where('TPS', $p['tps']);
+        }
+        if ($p['lp'] !== '') {
+            $builder->where('JENIS_KELAMIN', $p['lp']);
+        }
+        if ($p['dp4'] !== '') {
+            $builder->where($p['dp4'] > 0 ? 'OLD_NAMA IS NOT NULL' : 'OLD_NAMA IS NULL', null);
+        }
+        $builder->orderBy('DESA', 'ASC')->orderBy('CAST(TPS AS UNSIGNED)', 'ASC', false)->orderBy('NAMA', 'ASC');
+        $rows = $this->samarkanBarisPemeriksa($builder->get()->getResultArray(), ['NIK']);
+        $baris = [];
+        foreach ($rows as $i => $r) {
+            $baris[] = [$i + 1, $r['DESA'], $r['TPS'], $r['NIK'], $r['NAMA'], $r['TGLLHR'], $r['JENIS_KELAMIN'], $r['OLD_NAMA'] ?? ''];
+        }
+        $this->catatAkses('ekspor_pemilih_baru', count($baris) . ' baris (' . $this->formatEkspor() . ')');
+
+        return $this->kirimEkspor(['NO', 'DESA', 'TPS', 'NIK', 'NAMA', 'TGL LAHIR', 'L/P', 'NAMA LAMA'], $baris, 'pemilih-baru', $this->formatEkspor());
+    }
+
+    public function eksporTersaring()
+    {
+        $p = $this->paramTabel(['ket']);
+        $builder = db_connect()->table('tersaring')
+            ->select('DESA, TPS, NIK, NAMA, TGLLHR, LP, KET');
+        $this->saringWilayah($builder);
+        if ($p['desa'] !== '') {
+            $builder->where('DESA', $p['desa']);
+        }
+        if ($p['tps'] !== '') {
+            $builder->where('TPS', $p['tps']);
+        }
+        if ($p['lp'] !== '') {
+            $builder->where('LP', $p['lp']);
+        }
+        if ($p['ket'] !== '') {
+            $builder->where('KET', $p['ket']);
+        }
+        $builder->orderBy('DESA', 'ASC')->orderBy('CAST(TPS AS UNSIGNED)', 'ASC', false)->orderBy('NAMA', 'ASC');
+        $rows = $this->samarkanBarisPemeriksa($builder->get()->getResultArray(), ['NIK']);
+        $label = \App\Libraries\Keterangan::daftar();
+        $baris = [];
+        foreach ($rows as $i => $r) {
+            $baris[] = [$i + 1, $r['DESA'], $r['TPS'], $r['NIK'], $r['NAMA'], $r['TGLLHR'], $r['LP'], $label[(string) $r['KET']] ?? $r['KET']];
+        }
+        $this->catatAkses('ekspor_pemilih_tersaring', count($baris) . ' baris (' . $this->formatEkspor() . ')');
+
+        return $this->kirimEkspor(['NO', 'DESA', 'TPS', 'NIK', 'NAMA', 'TGL LAHIR', 'L/P', 'KETERANGAN'], $baris, 'pemilih-tersaring', $this->formatEkspor());
+    }
+
+    public function eksporPindah()
+    {
+        $p = $this->paramTabel(['stat']);
+        $builder = db_connect()->table('pindahtps')
+            ->select('NKK, NIK, NAMA, DESA, TPS, MSDESA, MSTPS, MSNAMA, MSLP, STATUS');
+        $this->saringWilayah($builder);
+        if ($p['desa'] !== '') {
+            $builder->where('DESA', $p['desa']);
+        }
+        if ($p['tps'] !== '') {
+            $builder->where('TPS', $p['tps']);
+        }
+        if ($p['lp'] !== '') {
+            $builder->where('MSLP', $p['lp']);
+        }
+        if ($p['stat'] !== '') {
+            if ($p['stat'] == 1) {
+                $builder->where('MSTPS >', '1');
+            } else {
+                $builder->where('MSTPS IS NULL', null);
+            }
+        }
+        $builder->orderBy('DESA', 'ASC')->orderBy('CAST(TPS AS UNSIGNED)', 'ASC', false)->orderBy('NAMA', 'ASC');
+        $rows = $this->samarkanBarisPemeriksa($builder->get()->getResultArray(), ['NKK', 'NIK']);
+        $baris = [];
+        foreach ($rows as $i => $r) {
+            $baris[] = [$i + 1, $r['NIK'], $r['NAMA'], $r['DESA'], $r['TPS'], $r['MSDESA'] ?? '', $r['MSTPS'] ?? '', $r['MSNAMA'] ?? '', $r['MSLP'] ?? '', \App\Libraries\KodeBiodata::STATUS[(string) $r['STATUS']] ?? (string) ($r['STATUS'] ?? '')];
+        }
+        $this->catatAkses('ekspor_pindah_tps', count($baris) . ' baris (' . $this->formatEkspor() . ')');
+
+        return $this->kirimEkspor(['NO', 'NIK', 'NAMA', 'DESA', 'TPS', 'DESA BARU', 'TPS BARU', 'NAMA BARU', 'L/P', 'STATUS'], $baris, 'pindah-tps', $this->formatEkspor());
+    }
+
+    private function formatEkspor(): string
+    {
+        return $this->request->getGet('format') === 'xlsx' ? 'xlsx' : 'csv';
+    }
+
     // -- Cetak daftar MS -------------------------------------------------
 
     /** Cetak daftar pemilih MS per desa/TPS sebagai halaman HTML siap cetak. */

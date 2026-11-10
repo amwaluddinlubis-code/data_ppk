@@ -100,5 +100,19 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('anomali/tabelTerselubung', 'Anomali::tabelTerselubung');
     $routes->get('anomali/tabelKk', 'Anomali::tabelKk');
     $routes->get('anomali/tabelUmur', 'Anomali::tabelUmur');
+
+    // Ekspor CSV/XLSX (Paket Menengah) — mengikuti saringan halaman.
+    $routes->get('ekspor/aktif', 'Pemilih::eksporAktif');
+    $routes->get('ekspor/baru', 'Pemilih::eksporBaru');
+    $routes->get('ekspor/tersaring', 'Pemilih::eksporTersaring');
+    $routes->get('ekspor/pindah', 'Pemilih::eksporPindah');
+    $routes->get('ekspor/ganda', 'Residu::eksporGanda');
+    $routes->get('ekspor/peringatan', 'Residu::eksporPeringatan');
+    $routes->get('ekspor/terselubung', 'Anomali::eksporTerselubung');
+    $routes->get('ekspor/kk', 'Anomali::eksporKk');
+    $routes->get('ekspor/umur', 'Anomali::eksporUmur');
+
+    // Pencarian global (Paket Menengah)
+    $routes->get('cari', 'Pencarian::index');
     $routes->post('anomali/acuan', 'Anomali::simpanAcuan');
 });

@@ -16,7 +16,16 @@
     <link rel="stylesheet" href="<?= base_url('assets/fontawesome/css/all.min.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/datatables.min.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
-    <style>[x-cloak] { display: none !important; }</style>
+    <style>
+        [x-cloak] { display: none !important; }
+        /* Menu sidebar parent-child: anak grup tersembunyi sampai
+           induknya dibuka (akordeon). */
+        .menu-grup .menu-anak { display: none; }
+        .menu-grup.terbuka .menu-anak { display: block; }
+        .menu-grup .panah-grup { transition: transform 200ms ease; }
+        .menu-grup.terbuka .panah-grup { transform: rotate(180deg); }
+        .menu-grup.punya-aktif > .menu-induk { font-weight: 700; color: hsl(var(--p)); }
+    </style>
 </head>
 <body class="bg-base-200 min-h-screen">
 <?php
@@ -44,7 +53,7 @@ $grupMenu = [];
 $grupMenu[] = ['grup' => null, 'menu' => [
     '' => ['label' => 'Dasbor', 'ikon' => 'fa-th-large'],
 ]];
-$grupMenu[] = ['grup' => 'Data Pemilih', 'menu' => [
+$grupMenu[] = ['grup' => 'Data Pemilih', 'ikonGrup' => 'fa-users', 'menu' => [
     'pemilih/aktifPrint' => ['label' => 'Pemilih Aktif (MS)', 'ikon' => 'fa-file-alt'],
     'pemilih/baru'       => ['label' => 'Pemilih Baru', 'ikon' => 'fa-user-plus'],
     'pemilih'            => ['label' => 'Pindah TPS', 'ikon' => 'fa-exchange-alt'],
@@ -53,14 +62,14 @@ $grupMenu[] = ['grup' => 'Data Pemilih', 'menu' => [
     'anomali'            => ['label' => 'Deteksi Anomali', 'ikon' => 'fa-search-plus'],
 ]];
 if (in_array($penggunaLogin['peran'], ['admin', 'operator'], true)) {
-    $grupMenu[] = ['grup' => 'Pengolahan', 'menu' => [
+    $grupMenu[] = ['grup' => 'Pengolahan', 'ikonGrup' => 'fa-cogs', 'menu' => [
         'coklit'  => ['label' => 'Kelola Data Coklit', 'ikon' => 'fa-pen'],
         'impor'   => ['label' => 'Impor Data', 'ikon' => 'fa-file-import'],
         'riwayat' => ['label' => 'Riwayat Perubahan', 'ikon' => 'fa-history'],
     ]];
 }
-$grupMenu[] = ['grup' => 'Laporan', 'menu' => [
-    'laporan' => ['label' => 'Laporan Ringkasan', 'ikon' => 'fa-chart-bar'],
+$grupMenu[] = ['grup' => 'Laporan', 'ikonGrup' => 'fa-chart-bar', 'menu' => [
+    'laporan' => ['label' => 'Laporan Ringkasan', 'ikon' => 'fa-chart-line'],
 ]];
 $menuAdmin = ['kecamatan' => ['label' => 'Kecamatan', 'ikon' => 'fa-map-marked-alt']];
 if ($penggunaLogin['peran'] === 'admin') {
@@ -68,10 +77,31 @@ if ($penggunaLogin['peran'] === 'admin') {
     $menuAdmin['log-akses'] = ['label' => 'Log Akses', 'ikon' => 'fa-shield-alt'];
     $menuAdmin['backup']    = ['label' => 'Cadangan Data', 'ikon' => 'fa-database'];
 }
-$grupMenu[] = ['grup' => 'Administrasi', 'menu' => $menuAdmin];
-$grupMenu[] = ['grup' => 'Akun', 'menu' => [
+$grupMenu[] = ['grup' => 'Administrasi', 'ikonGrup' => 'fa-cog', 'menu' => $menuAdmin];
+$grupMenu[] = ['grup' => 'Akun', 'ikonGrup' => 'fa-user-circle', 'menu' => [
     'ganti-sandi' => ['label' => 'Ganti Sandi', 'ikon' => 'fa-key'],
 ]];
+
+// Grup yang memuat halaman aktif (induknya dibuka otomatis).
+$grupAktifNama = null;
+foreach ($grupMenu as $g) {
+    if ($g['grup'] !== null && array_key_exists($kunciAktif, $g['menu'])) {
+        $grupAktifNama = $g['grup'];
+        break;
+    }
+}
+
+// Filter kecamatan untuk pengguna tingkat kabupaten (Admin): cakupan
+// akunnya tidak terkunci, jadi ia bebas menyaring per sesi. Mekanisme
+// sesi-nya sudah ada di Wilayah + Kecamatan::aktifkan — di sini hanya
+// pemilih cepatnya di sidebar.
+$bebasWilayah = \App\Libraries\Wilayah::kecPengguna() === null;
+$filterKecAktif = \App\Libraries\Wilayah::kecEfektif();
+$daftarKecFilter = [];
+if ($bebasWilayah) {
+    $daftarKecFilter = db_connect()->table('kecamatan')
+        ->select('nama')->orderBy('nama', 'ASC')->get()->getResultArray();
+}
 ?>
 <div class="drawer lg:drawer-open">
     <input id="drawer-utama" type="checkbox" class="drawer-toggle">
@@ -94,6 +124,18 @@ $grupMenu[] = ['grup' => 'Akun', 'menu' => [
                 <span class="badge badge-primary badge-outline gap-1">
                     <i class="fas fa-map-marker-alt"></i> <?= esc($scopeLabel) ?>
                 </span>
+            </div>
+            <div class="flex-none hidden sm:block mx-1">
+                <form method="get" action="<?= base_url('cari') ?>" class="join" role="search">
+                    <input type="text" name="q" minlength="3" required
+                           class="input input-bordered input-sm join-item w-40 lg:w-56"
+                           placeholder="Cari nama / NIK / NKK…"
+                           value="<?= esc((string) ($_GET['q'] ?? ''), 'attr') ?>"
+                           title="Pencarian global: nama, NIK, atau NKK di seluruh data">
+                    <button type="submit" class="btn btn-sm btn-primary join-item" title="Pencarian global" aria-label="Pencarian global">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </form>
             </div>
             <div class="flex-none ml-1">
                 <button type="button" id="tombol-tema" class="btn btn-ghost btn-square" title="Ganti tema terang/gelap" aria-label="Ganti tema terang/gelap">
@@ -165,21 +207,65 @@ $grupMenu[] = ['grup' => 'Akun', 'menu' => [
                     <div class="text-xs opacity-60"><?= esc($labelTingkat) ?></div>
                 </div>
             </div>
-            <nav class="flex-1 overflow-y-auto p-3">
+            <?php if ($bebasWilayah) : ?>
+                <div class="px-4 py-3 border-b border-base-200">
+                    <form method="post" action="<?= base_url('kecamatan/aktifkan') ?>">
+                        <?= csrf_field() ?>
+                        <label class="form-control">
+                            <span class="label py-0 pb-1">
+                                <span class="label-text text-[11px] font-bold uppercase tracking-wider opacity-60">
+                                    <i class="fas fa-filter"></i> Filter Kecamatan
+                                </span>
+                            </span>
+                            <select name="kecamatan" class="select select-bordered select-sm w-full"
+                                    onchange="this.form.submit()"
+                                    title="Saring seluruh tampilan ke satu kecamatan (khusus admin kabupaten)">
+                                <option value="__semua__" <?= $filterKecAktif === null ? 'selected' : '' ?>>Seluruh Kabupaten</option>
+                                <?php foreach ($daftarKecFilter as $k) : ?>
+                                    <option value="<?= esc($k['nama'], 'attr') ?>" <?= $filterKecAktif === $k['nama'] ? 'selected' : '' ?>>
+                                        Kec. <?= esc(ucwords(strtolower($k['nama']))) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                    </form>
+                </div>
+            <?php endif; ?>
+            <nav class="flex-1 overflow-y-auto p-3" id="nav-samping">
                 <?php foreach ($grupMenu as $grup) : ?>
-                    <?php if ($grup['grup'] !== null) : ?>
-                        <div class="px-2 pt-3 pb-1 text-[11px] font-bold uppercase tracking-wider opacity-50"><?= esc($grup['grup']) ?></div>
+                    <?php if ($grup['grup'] === null) : ?>
+                        <ul class="menu p-0 gap-1 text-sm w-full">
+                            <?php foreach ($grup['menu'] as $kunci => $m) : ?>
+                                <li>
+                                    <a href="<?= base_url($kunci) ?>"
+                                       class="<?= $kunciAktif === $kunci ? 'active' : '' ?>">
+                                        <i class="fas <?= $m['ikon'] ?> w-5 text-center"></i> <?= $m['label'] ?>
+                                    </a>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else : ?>
+                        <?php $punyaAktif = $grupAktifNama === $grup['grup']; ?>
+                        <div class="menu-grup <?= $punyaAktif ? 'terbuka punya-aktif' : '' ?>" data-grup="<?= esc($grup['grup'], 'attr') ?>">
+                            <button type="button"
+                                    class="menu-induk w-full flex items-center gap-2 px-3 py-2 mt-2 rounded-lg text-[12px] font-bold uppercase tracking-wider opacity-80 hover:bg-base-200 hover:opacity-100"
+                                    aria-expanded="<?= $punyaAktif ? 'true' : 'false' ?>">
+                                <i class="fas <?= $grup['ikonGrup'] ?? 'fa-folder' ?> w-5 text-center"></i>
+                                <span class="flex-1 text-left"><?= esc($grup['grup']) ?></span>
+                                <i class="fas fa-chevron-down panah-grup text-[10px]"></i>
+                            </button>
+                            <ul class="menu menu-anak p-0 pl-3 gap-1 text-sm w-full">
+                                <?php foreach ($grup['menu'] as $kunci => $m) : ?>
+                                    <li>
+                                        <a href="<?= base_url($kunci) ?>"
+                                           class="<?= $kunciAktif === $kunci ? 'active' : '' ?>">
+                                            <i class="fas <?= $m['ikon'] ?> w-5 text-center"></i> <?= $m['label'] ?>
+                                        </a>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
                     <?php endif; ?>
-                    <ul class="menu p-0 gap-1 text-sm w-full">
-                        <?php foreach ($grup['menu'] as $kunci => $m) : ?>
-                            <li>
-                                <a href="<?= base_url($kunci) ?>"
-                                   class="<?= $kunciAktif === $kunci ? 'active' : '' ?>">
-                                    <i class="fas <?= $m['ikon'] ?> w-5 text-center"></i> <?= $m['label'] ?>
-                                </a>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
                 <?php endforeach; ?>
             </nav>
             <div class="p-3 text-[11px] opacity-50 border-t border-base-200">
@@ -327,6 +413,38 @@ function muatDaftarTps(desa) {
             if (urutan === urutanMuatTps) $tps.prop('disabled', false);
         });
 }
+</script>
+<script>
+// Menu sidebar parent-child (akordeon): satu grup terbuka dalam satu
+// waktu. Grup berisi halaman aktif selalu terbuka; selain itu pilihan
+// terakhir pengguna diingat per peramban.
+(function () {
+    var grups = Array.prototype.slice.call(document.querySelectorAll('#nav-samping .menu-grup'));
+    if (!grups.length) return;
+    function atur(grup, buka) {
+        grup.classList.toggle('terbuka', buka);
+        var induk = grup.querySelector('.menu-induk');
+        if (induk) induk.setAttribute('aria-expanded', buka ? 'true' : 'false');
+    }
+    var adaAktif = grups.some(function (g) { return g.classList.contains('punya-aktif'); });
+    if (!adaAktif) {
+        var simpan = null;
+        try { simpan = localStorage.getItem('grup-menu-pemilih'); } catch (e) {}
+        grups.forEach(function (g) { atur(g, g.getAttribute('data-grup') === simpan); });
+    }
+    grups.forEach(function (g) {
+        var induk = g.querySelector('.menu-induk');
+        if (!induk) return;
+        induk.addEventListener('click', function () {
+            var akanBuka = !g.classList.contains('terbuka');
+            grups.forEach(function (lain) { atur(lain, lain === g ? akanBuka : false); });
+            try {
+                if (akanBuka) localStorage.setItem('grup-menu-pemilih', g.getAttribute('data-grup'));
+                else localStorage.removeItem('grup-menu-pemilih');
+            } catch (e) {}
+        });
+    });
+})();
 </script>
 <script>
 <?= $this->renderSection('javascript') ?>

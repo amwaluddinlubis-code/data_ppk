@@ -61,6 +61,12 @@
                 <a href="<?= base_url('pemilih') ?>" class="btn btn-error btn-sm">
                     <i class="fas fa-undo"></i> RESET FILTER
                 </a>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporData('csv')">
+                    <i class="fas fa-file-csv"></i> EKSPOR CSV
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporData('xlsx')">
+                    <i class="fas fa-file-excel"></i> EKSPOR EXCEL
+                </button>
             </div>
         </div>
 
@@ -73,5 +79,16 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
+function eksporData(format) {
+    var params = new URLSearchParams({
+        desa: $('#DESA').val() || '',
+        tps: $('#TPS').val() || '',
+        lp: $('#LP').val() || '',
+        stat: $('#STAT').val() || '',
+        format: format
+    });
+    window.location = "<?= base_url('ekspor/pindah') ?>" + '?' + params.toString();
+}
+
 // Tabel halaman ini memakai HTMX (partial server-side).
 <?= $this->endSection() ?>

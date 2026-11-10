@@ -524,6 +524,100 @@ class Anomali extends BaseController
         ]));
     }
 
+    // -- Ekspor (Paket Menengah) ------------------------------------------
+
+    public function eksporTerselubung()
+    {
+        $format = $this->request->getGet('format') === 'xlsx' ? 'xlsx' : 'csv';
+        $db     = db_connect();
+        $niks   = $this->nikTerselubung($this->pasanganTerselubung());
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.TGL_LAHIR, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET, mhc.SUMBER', false)
+            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
+            ->orderBy('mhc.NAMA', 'ASC')->orderBy('mhc.TGL_LAHIR', 'ASC')->orderBy('mhc.NIK', 'ASC');
+        if ($niks === []) {
+            $builder->where('1 = 0', null, false);
+        } else {
+            $builder->whereIn('mhc.NIK', $niks);
+        }
+        $rows  = $this->samarkanBarisPemeriksa($builder->get()->getResultArray(), ['NIK', 'NKK']);
+        $label = \App\Libraries\Keterangan::daftar();
+        $baris = [];
+        foreach ($rows as $i => $r) {
+            $baris[] = [$i + 1, $r['NIK'], $r['NKK'], $r['NAMA'], $r['TGL_LAHIR'] ? date('d-m-Y', strtotime((string) $r['TGL_LAHIR'])) : '', $r['JENIS_KELAMIN'], $r['KEC'], $r['DESA'], $r['TPS'], $label[(string) $r['KET']] ?? $r['KET'], $r['SUMBER']];
+        }
+        $this->catatAkses('ekspor_anomali_terselubung', count($baris) . ' baris (' . $format . ')');
+
+        return $this->kirimEkspor(['NO', 'NIK', 'NKK', 'NAMA', 'TGL LAHIR', 'L/P', 'KECAMATAN', 'DESA', 'TPS', 'KETERANGAN', 'SUMBER'], $baris, 'duplikat-terselubung', $format);
+    }
+
+    public function eksporKk()
+    {
+        $format   = $this->request->getGet('format') === 'xlsx' ? 'xlsx' : 'csv';
+        $kategori = trim((string) $this->request->getGet('kategori'));
+        $db       = db_connect();
+        $peta     = $this->petaKkTersebar();
+        $nkks     = [];
+        foreach ($peta as $nkk => $kat) {
+            if ($kategori === '' || $kat === $kategori) {
+                $nkks[] = $nkk;
+            }
+        }
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NKK, mhc.NIK, mhc.NAMA, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
+            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
+            ->orderBy('mhc.NKK', 'ASC')->orderBy('KEC', 'ASC')->orderBy('DESA', 'ASC')->orderBy('mhc.TPS', 'ASC')->orderBy('mhc.NAMA', 'ASC');
+        if ($nkks === []) {
+            $builder->where('1 = 0', null, false);
+        } else {
+            $builder->whereIn('mhc.NKK', $nkks);
+        }
+        $rows  = $this->samarkanBarisPemeriksa($builder->get()->getResultArray(), ['NKK', 'NIK']);
+        $label = \App\Libraries\Keterangan::daftar();
+        $baris = [];
+        foreach ($rows as $i => $r) {
+            $baris[] = [$i + 1, $r['NKK'], $r['NIK'], $r['NAMA'], $r['JENIS_KELAMIN'], $r['KEC'], $r['DESA'], $r['TPS'], $label[(string) $r['KET']] ?? $r['KET'], ($peta[$r['NKK']] ?? 'tps') === 'desa' ? 'Antar Desa' : 'Beda TPS'];
+        }
+        $this->catatAkses('ekspor_anomali_kk', count($baris) . ' baris (' . $format . ')');
+
+        return $this->kirimEkspor(['NO', 'NKK', 'NIK', 'NAMA', 'L/P', 'KECAMATAN', 'DESA', 'TPS', 'KETERANGAN', 'KATEGORI'], $baris, 'kk-tersebar', $format);
+    }
+
+    public function eksporUmur()
+    {
+        $format   = $this->request->getGet('format') === 'xlsx' ? 'xlsx' : 'csv';
+        $kategori = trim((string) $this->request->getGet('kategori'));
+        $db       = db_connect();
+        $acuan    = $this->tanggalAcuan();
+        [$batas100, $batas17] = $this->batasUmur($acuan);
+        $kondisi = match ($kategori) {
+            'atas'  => "mhc.TGL_LAHIR < '{$batas100}'",
+            'bawah' => "(mhc.TGL_LAHIR > '{$batas17}' AND mhc.STATUS = 'B')",
+            default => "(mhc.TGL_LAHIR < '{$batas100}' OR (mhc.TGL_LAHIR > '{$batas17}' AND mhc.STATUS = 'B'))",
+        };
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.TGL_LAHIR, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
+            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
+            ->where($kondisi, null, false)
+            ->orderBy('mhc.TGL_LAHIR', 'ASC')->orderBy('mhc.NAMA', 'ASC');
+        \App\Libraries\Wilayah::saringId($builder);
+        $rows  = $this->samarkanBarisPemeriksa($builder->get()->getResultArray(), ['NIK', 'NKK']);
+        $label = \App\Libraries\Keterangan::daftar();
+        $baris = [];
+        foreach ($rows as $i => $r) {
+            $baris[] = [$i + 1, $r['NIK'], $r['NKK'], $r['NAMA'], $r['TGL_LAHIR'] ? date('d-m-Y', strtotime((string) $r['TGL_LAHIR'])) : '', $r['JENIS_KELAMIN'], $r['KEC'], $r['DESA'], $r['TPS'], $label[(string) $r['KET']] ?? $r['KET'], (new \DateTimeImmutable((string) $r['TGL_LAHIR']))->diff(new \DateTimeImmutable($acuan))->y . ' tahun', (string) $r['TGL_LAHIR'] < $batas100 ? 'Di Atas 100 Tahun' : 'Di Bawah 17 Tahun'];
+        }
+        $this->catatAkses('ekspor_anomali_umur', count($baris) . ' baris (' . $format . ')');
+
+        return $this->kirimEkspor(['NO', 'NIK', 'NKK', 'NAMA', 'TGL LAHIR', 'L/P', 'KECAMATAN', 'DESA', 'TPS', 'KETERANGAN', 'UMUR', 'KATEGORI'], $baris, 'umur-ekstrem', $format);
+    }
+
     /** Ekspresi SQL tanggal lahir (hari) yang terkode pada NIK, apa adanya. */
     private function ekspresiHariNik(string $alias = 'm'): string
     {

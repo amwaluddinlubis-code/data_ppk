@@ -48,6 +48,14 @@
                        hx-get="<?= base_url('anomali/tabelTerselubung') ?>" hx-target="#wadah-terselubung" hx-swap="innerHTML"
                        hx-trigger="input changed delay:500ms">
             </label>
+            <div class="flex gap-2">
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporAnomali('terselubung', 'csv', '')">
+                    <i class="fas fa-file-csv"></i> CSV
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporAnomali('terselubung', 'xlsx', '')">
+                    <i class="fas fa-file-excel"></i> EXCEL
+                </button>
+            </div>
         </div>
         <div id="wadah-terselubung">
             <?= view('anomali/_tabel_terselubung', $tabelTerselubungAwal) ?>
@@ -76,6 +84,14 @@
                        hx-get="<?= base_url('anomali/tabelKk') ?>" hx-target="#wadah-kk" hx-swap="innerHTML"
                        hx-trigger="input changed delay:500ms" hx-include="#kategoriKk">
             </label>
+            <div class="flex gap-2">
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporAnomali('kk', 'csv', document.getElementById('kategoriKk').value)">
+                    <i class="fas fa-file-csv"></i> CSV
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporAnomali('kk', 'xlsx', document.getElementById('kategoriKk').value)">
+                    <i class="fas fa-file-excel"></i> EXCEL
+                </button>
+            </div>
         </div>
         <div id="wadah-kk">
             <?= view('anomali/_tabel_kk', $tabelKkAwal) ?>
@@ -119,6 +135,14 @@
                        hx-get="<?= base_url('anomali/tabelUmur') ?>" hx-target="#wadah-umur" hx-swap="innerHTML"
                        hx-trigger="input changed delay:500ms" hx-include="#kategoriUmur">
             </label>
+            <div class="flex gap-2">
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporAnomali('umur', 'csv', document.getElementById('kategoriUmur').value)">
+                    <i class="fas fa-file-csv"></i> CSV
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporAnomali('umur', 'xlsx', document.getElementById('kategoriUmur').value)">
+                    <i class="fas fa-file-excel"></i> EXCEL
+                </button>
+            </div>
         </div>
         <div id="wadah-umur">
             <?= view('anomali/_tabel_umur', $tabelUmurAwal) ?>
@@ -192,5 +216,8 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
+function eksporAnomali(jenis, format, kategori) {
+    window.location = "<?= base_url('ekspor') ?>" + '/' + jenis + '?kategori=' + encodeURIComponent(kategori || '') + '&format=' + format;
+}
 // Ketiga tabel halaman ini memakai HTMX (partial server-side).
 <?= $this->endSection() ?>

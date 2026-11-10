@@ -48,6 +48,14 @@
             <span class="badge badge-info badge-sm" x-show="memuat" x-cloak>
                 <span class="loading loading-spinner loading-xs"></span> Memuat…
             </span>
+            <div class="flex gap-2 ml-auto">
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporGanda('csv')">
+                    <i class="fas fa-file-csv"></i> CSV
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporGanda('xlsx')">
+                    <i class="fas fa-file-excel"></i> EXCEL
+                </button>
+            </div>
         </div>
         <div id="wadah-ganda">
             <?= view('residu/_tabel_ganda', $tabelGandaAwal) ?>
@@ -61,6 +69,14 @@
         <div class="flex flex-wrap items-center gap-3 mb-2">
             <div class="text-sm font-bold">PERINGATAN: JENIS KELAMIN TIDAK COCOK DENGAN KODE NIK</div>
             <div class="badge badge-warning badge-lg"><?= number_format($jmlPeringatan, 0, ',', '.') ?> pemilih</div>
+            <div class="flex gap-2 ml-auto">
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporPeringatan('csv')">
+                    <i class="fas fa-file-csv"></i> CSV
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporPeringatan('xlsx')">
+                    <i class="fas fa-file-excel"></i> EXCEL
+                </button>
+            </div>
         </div>
         <p class="text-xs opacity-70 mb-3">Jenis kelamin yang tercatat berbeda dengan kode pada NIK — pada NIK, perempuan dikodekan sebagai tanggal lahir ditambah 40. Ini <strong>hanya peringatan</strong>: perbedaan seperti ini sering berasal dari data Dukcapil dan belum tentu datanya salah. Gunakan sebagai bahan klarifikasi, dan jangan mengubah data hanya berdasarkan peringatan ini.</p>
         <div class="flex flex-wrap items-end gap-3 mb-3">
@@ -79,5 +95,12 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
+function eksporGanda(format) {
+    var kat = document.getElementById('kategori').value || '';
+    window.location = "<?= base_url('ekspor/ganda') ?>" + '?kategori=' + encodeURIComponent(kat) + '&format=' + format;
+}
+function eksporPeringatan(format) {
+    window.location = "<?= base_url('ekspor/peringatan') ?>" + '?format=' + format;
+}
 // Kedua tabel halaman ini memakai HTMX (partial server-side).
 <?= $this->endSection() ?>

@@ -56,6 +56,12 @@
                 <button type="button" class="btn btn-success btn-sm" onclick="printPdf()">
                     <i class="fas fa-print"></i> CETAK DPS
                 </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporData('csv')">
+                    <i class="fas fa-file-csv"></i> EKSPOR CSV
+                </button>
+                <button type="button" class="btn btn-outline btn-sm" onclick="eksporData('xlsx')">
+                    <i class="fas fa-file-excel"></i> EKSPOR EXCEL
+                </button>
                 <button type="button" class="btn btn-secondary btn-sm" onclick="printPdfFile()">
                     <i class="fas fa-file-pdf"></i> PDF
                 </button>
@@ -72,7 +78,17 @@
 
 <?= $this->section('javascript') ?>
 // Tabel halaman ini memakai HTMX (partial server-side); yang tersisa
-// di sini hanya fungsi tombol cetak.
+// di sini hanya fungsi tombol cetak dan ekspor.
+function eksporData(format) {
+    var params = new URLSearchParams({
+        desa: $('#DESA').val() || '',
+        tps: $('#TPS').val() || '',
+        lp: $('#LP').val() || '',
+        format: format
+    });
+    window.location = "<?= base_url('ekspor/aktif') ?>" + '?' + params.toString();
+}
+
 function printPdf() {
     var desa = $('#DESA').val();
     var tps = $('#TPS').val();

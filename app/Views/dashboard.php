@@ -34,6 +34,43 @@ $kartu = [
     <?php endforeach; ?>
 </div>
 
+<!-- Perlu Ditangani: pintu tugas harian (Paket Menengah) -->
+<div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+        <div class="flex items-center gap-2 mb-3">
+            <i class="fas fa-clipboard-check text-warning"></i>
+            <span class="font-bold text-sm">PERLU DITANGANI</span>
+            <span class="text-xs opacity-60">Temuan data yang menunggu pemeriksaan Anda — klik untuk membuka daftarnya.</span>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+            <?php
+            $kartuPerlu = [
+                ['label' => 'NIK Ganda Antar Wilayah', 'nilai' => $perlu['ganda'], 'satuan' => 'NIK', 'tautan' => base_url('residu'), 'ikon' => 'fa-clone'],
+                ['label' => 'Peringatan JK vs NIK', 'nilai' => $perlu['peringatan'], 'satuan' => 'pemilih', 'tautan' => base_url('residu'), 'ikon' => 'fa-venus-mars'],
+                ['label' => 'Duplikat Terselubung', 'nilai' => $perlu['terselubung'], 'satuan' => 'kelompok', 'tautan' => base_url('anomali'), 'ikon' => 'fa-user-secret'],
+                ['label' => 'KK Tersebar', 'nilai' => $perlu['kk'], 'satuan' => 'KK', 'tautan' => base_url('anomali'), 'ikon' => 'fa-house-circle-exclamation'],
+                ['label' => 'Umur Ekstrem', 'nilai' => $perlu['umur'], 'satuan' => 'pemilih', 'tautan' => base_url('anomali'), 'ikon' => 'fa-cake-candles'],
+            ];
+            ?>
+            <?php foreach ($kartuPerlu as $k) : ?>
+                <a href="<?= $k['tautan'] ?>" class="card <?= $k['nilai'] > 0 ? 'bg-warning/10 border border-warning/40' : 'bg-base-200/60' ?> hover:shadow transition">
+                    <div class="card-body p-3">
+                        <div class="flex items-center gap-2 text-xs font-semibold opacity-70">
+                            <i class="fas <?= $k['ikon'] ?>"></i> <?= esc($k['label']) ?>
+                        </div>
+                        <div class="text-2xl font-bold mt-1">
+                            <?= number_format($k['nilai'], 0, ',', '.') ?> <span class="text-xs font-normal opacity-60"><?= esc($k['satuan']) ?></span>
+                        </div>
+                        <div class="text-xs <?= $k['nilai'] > 0 ? 'text-warning font-semibold' : 'opacity-50' ?>">
+                            <?= $k['nilai'] > 0 ? 'Perlu diperiksa →' : 'Bersih' ?>
+                        </div>
+                    </div>
+                </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-3 mb-4">
     <!-- Rincian L/P pada daftar MS -->
     <div class="card bg-base-100 shadow">
