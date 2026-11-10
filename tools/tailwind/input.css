@@ -75,6 +75,73 @@
   .btm-nav {
     @apply bg-base-100/95 backdrop-blur-md;
   }
+
+  .app-footer {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 3rem;
+    z-index: 20;
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem;
+    border-top: 1px solid oklch(var(--b3));
+    background-color: oklch(var(--b1) / 0.95);
+    backdrop-filter: blur(12px);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    text-align: center;
+  }
+
+  .filter-controls-panel {
+    padding: 0.75rem;
+    border: 1px solid oklch(var(--b3));
+    border-radius: 0.75rem;
+    background-color: oklch(var(--b2) / 0.55);
+  }
+
+  .filter-table-panel {
+    overflow: hidden;
+    padding: 0.5rem;
+    border: 1px solid oklch(var(--b3));
+    border-radius: 0.75rem;
+    background-color: oklch(var(--b1));
+  }
+
+  .filter-toggle {
+    display: none;
+  }
+
+  .filter-toggle-count {
+    margin-left: auto;
+    color: oklch(var(--p));
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .filter-toggle-icon {
+    margin-left: 0.5rem;
+    font-size: 0.7rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-footer {
+    left: 18rem;
+    bottom: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .filter-toggle {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+
+  .filter-controls-collapsed {
+    display: none !important;
+  }
 }
 
 @media print {
@@ -87,5 +154,20 @@
   .overflow-x-auto:has(> .table) {
     max-height: none;
     overflow: visible;
+  }
+
+  .app-footer {
+    position: static;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .filter-toggle {
+    display: none !important;
+  }
+
+  .filter-controls-collapsed {
+    display: flex !important;
   }
 }

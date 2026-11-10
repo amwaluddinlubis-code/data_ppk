@@ -12,7 +12,7 @@
         <div class="flex flex-wrap items-end gap-3 mb-4" data-filter-controls>
             <label class="form-control w-full sm:w-60">
                 <span class="label"><span class="label-text font-semibold">DESA</span></span>
-                <select class="select select-bordered select-sm" id="DESA" name="desa"
+                <select class="select select-bordered select-sm" id="DESA" name="desa" data-clear-select="#TPS"
                         hx-get="<?= base_url('filter/tps-opsi') ?>" hx-target="#TPS" hx-swap="innerHTML"
                         hx-vals='{"sumber":"baru"}'>
                     <option value="">PILIH DESA</option>

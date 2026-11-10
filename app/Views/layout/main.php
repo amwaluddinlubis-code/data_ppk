@@ -105,9 +105,9 @@ if ($bebasWilayah) {
                     <i class="fas fa-bars text-lg"></i>
                 </label>
             </div>
-            <div class="flex-1 min-w-0 flex flex-col justify-center">
-                <div class="font-bold text-base md:text-lg leading-tight truncate"><?= esc($title_page) ?></div>
-                <div class="text-xs opacity-70 leading-tight truncate">
+            <div class="flex-1 min-w-0 flex flex-col justify-center overflow-hidden">
+                <div class="w-full overflow-hidden font-bold text-sm sm:text-base md:text-lg leading-tight truncate"><?= esc($title_page) ?></div>
+                <div class="hidden sm:block w-full overflow-hidden text-xs opacity-70 leading-tight truncate">
                     <?= $namaKabupaten !== '' ? 'Kabupaten ' . esc($namaKabupaten) . ' &middot; ' : '' ?><?= esc($scopeLabel) ?>
                 </div>
             </div>
@@ -145,7 +145,7 @@ if ($bebasWilayah) {
                             <span class="block text-sm font-semibold truncate max-w-[10rem]"><?= esc($penggunaLogin['nama']) ?></span>
                             <span class="block text-[11px] opacity-60"><?= esc($labelTingkat) ?></span>
                         </span>
-                        <i class="fas fa-chevron-down text-xs opacity-60"></i>
+                        <i class="fas fa-chevron-down hidden sm:inline text-xs opacity-60"></i>
                     </label>
                     <ul tabindex="0" class="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-56 z-50 border border-base-300">
                         <li class="menu-title"><?= esc($labelPeran) ?></li>
@@ -157,7 +157,7 @@ if ($bebasWilayah) {
         </div>
 
         <!-- Isi halaman -->
-        <main class="p-3 md:p-5 pb-24 lg:pb-5 w-full max-w-[1600px] mx-auto">
+        <main class="p-3 md:p-5 pb-32 lg:pb-16 w-full max-w-[1600px] mx-auto">
             <?php if (session()->getFlashdata('galat')) : ?>
                 <div class="alert alert-error text-sm mb-3"><?= esc(session()->getFlashdata('galat')) ?></div>
             <?php endif; ?>
@@ -170,8 +170,10 @@ if ($bebasWilayah) {
             <?= $this->renderSection('content') ?>
         </main>
 
-        <footer class="footer footer-center p-4 pb-24 lg:pb-4 text-xs opacity-60 mt-auto">
-            <p>Aplikasi Data Pemilih<?= $namaKabupaten !== '' ? ' &mdash; Kabupaten ' . esc($namaKabupaten) : '' ?> &middot; <?= esc($scopeLabel) ?></p>
+        <footer class="footer footer-center app-footer">
+            <div class="space-y-1">
+                <p>Dikembangkan oleh: Amwaluddin Lubis @iamlubis &middot; PPK Ranto Baek &middot; Pemilu 2024</p>
+            </div>
         </footer>
     </div>
 
@@ -400,6 +402,138 @@ setTimeout(function () {
 }, 6000);
 </script>
 <script>
+// Applying a select filter updates its HTMX table without requiring the
+// explicit FILTER button. Keep dependent selects synchronized as well.
+(function () {
+    function initializeFilter(panel) {
+        var controls = panel.querySelector('[data-filter-controls]');
+        var apply = panel.querySelector('[data-filter-apply]');
+        var reset = panel.querySelector('[data-filter-reset]');
+        var chips = panel.querySelector('[data-filter-chips]');
+        if (!controls || !apply) return;
+
+        var fields = Array.prototype.slice.call(controls.querySelectorAll('select[name], input[type="text"][name]'));
+        var suppressAutoApply = false;
+        var toggle = document.createElement('button');
+        var toggleLabel = document.createElement('span');
+        var toggleCount = document.createElement('span');
+        var toggleIcon = document.createElement('i');
+        var controlsId = 'filter-controls-' + Math.random().toString(36).slice(2);
+        var mobileFilters = window.matchMedia('(max-width: 639px)');
+        var collapsed = mobileFilters.matches;
+
+        toggle.type = 'button';
+        toggle.className = 'btn btn-outline btn-sm filter-toggle';
+        toggle.setAttribute('aria-controls', controlsId);
+        toggleLabel.textContent = 'Filter & opsi';
+        toggleCount.className = 'filter-toggle-count';
+        toggleIcon.className = 'fas fa-chevron-down filter-toggle-icon';
+        toggle.append(toggleLabel, toggleCount, toggleIcon);
+        controls.id = controlsId;
+        controls.classList.add('filter-controls-panel');
+        controls.parentNode.insertBefore(toggle, controls);
+
+        var table = panel.querySelector('[id^="wadah-tabel-"], #wadah-hasil-coklit');
+        if (table) table.classList.add('filter-table-panel');
+
+        function setCollapsed(value) {
+            collapsed = value;
+            controls.classList.toggle('filter-controls-collapsed', collapsed);
+            toggle.setAttribute('aria-expanded', String(!collapsed));
+            toggleIcon.classList.toggle('fa-chevron-down', collapsed);
+            toggleIcon.classList.toggle('fa-chevron-up', !collapsed);
+        }
+
+        toggle.addEventListener('click', function () {
+            setCollapsed(!collapsed);
+        });
+        mobileFilters.addEventListener('change', function (event) {
+            setCollapsed(event.matches);
+        });
+        setCollapsed(collapsed);
+
+        function refreshChips() {
+            var activeCount = fields.filter(function (field) {
+                return field.value.trim() !== '';
+            }).length;
+            toggleCount.textContent = activeCount ? activeCount + ' aktif' : '';
+            if (!chips) return;
+            chips.replaceChildren();
+
+            fields.forEach(function (field) {
+                var value = field.value.trim();
+                if (!value) return;
+
+                var label = field.closest('label');
+                var labelText = label && label.querySelector('.label-text');
+                var name = labelText ? labelText.textContent.trim() : field.name;
+                var displayValue = field.tagName === 'SELECT'
+                    ? field.options[field.selectedIndex].textContent.trim()
+                    : value;
+                var chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'badge badge-outline h-auto min-h-7 gap-1.5 px-2.5 py-1 font-medium hover:badge-primary';
+                chip.textContent = name + ': ' + displayValue + '  x';
+                chip.setAttribute('aria-label', 'Hapus filter ' + name);
+                chip.addEventListener('click', function () {
+                    field.value = '';
+                    if (field.tagName === 'SELECT') {
+                        field.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else {
+                        field.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+                chips.appendChild(chip);
+            });
+
+            var kosong = chips.childElementCount === 0;
+            chips.hidden = kosong;
+            chips.classList.toggle('hidden', kosong);
+        }
+
+        fields.forEach(function (field) {
+            field.addEventListener('input', refreshChips);
+            field.addEventListener('change', function () {
+                if (field.dataset.clearSelect) {
+                    var dependent = panel.querySelector(field.dataset.clearSelect);
+                    if (dependent && dependent.value) {
+                        suppressAutoApply = true;
+                        dependent.value = '';
+                        dependent.dispatchEvent(new Event('change', { bubbles: true }));
+                        suppressAutoApply = false;
+                    }
+                }
+
+                refreshChips();
+                if (!suppressAutoApply) apply.click();
+            });
+        });
+
+        if (reset) {
+            reset.addEventListener('click', function () {
+                suppressAutoApply = true;
+                var changedSelects = [];
+                fields.forEach(function (field) {
+                    if (!field.value) return;
+                    field.value = '';
+                    if (field.tagName === 'SELECT') changedSelects.push(field);
+                });
+                changedSelects.forEach(function (field) {
+                    field.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                suppressAutoApply = false;
+                refreshChips();
+                apply.click();
+            });
+        }
+
+        refreshChips();
+    }
+
+    document.querySelectorAll('[data-filter-panel]').forEach(initializeFilter);
+})();
+</script>
+<script>
 // Filter TPS dinamis: isi pilihan #TPS dari nomor yang benar-benar
 // ada pada data halaman/desa aktif, bukan daftar tetap 1–5. Nomor
 // urut permintaan mencegah jawaban lama menimpa daftar desa terbaru
@@ -527,7 +661,7 @@ function muatDaftarTps(desa) {
 (function () {
     function labelTerpilih(sel) {
         var op = sel.options[sel.selectedIndex];
-        return op ? op.textContent : '';
+        return op ? op.textContent.trim() : '';
     }
 
     function tingkatkan(sel) {
@@ -573,12 +707,12 @@ function muatDaftarTps(desa) {
             Array.prototype.forEach.call(sel.options, function (op) {
                 var li = document.createElement('li');
                 var a = document.createElement('a');
-                a.textContent = op.textContent;
+                a.textContent = op.textContent.trim();
                 if (op.value === sel.value) a.classList.add('active');
                 a.addEventListener('mousedown', function (ev) {
                     ev.preventDefault();
                     sel.value = op.value;
-                    masukan.value = op.textContent;
+                    masukan.value = labelTerpilih(sel);
                     sel.dispatchEvent(new Event('change', { bubbles: true }));
                     masukan.blur();
                 });
