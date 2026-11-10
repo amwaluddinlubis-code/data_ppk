@@ -153,9 +153,11 @@ class ImporMassal extends BaseCommand
         $totalMasuk = 0;
         $totalGagal = 0;
         $totalTeralih = 0;
+        $berkasGagal = 0;
         foreach ($berkas as $f) {
             $hasil = $this->prosesBerkas($f);
             if ($hasil === null) {
+                $berkasGagal++;
                 continue;
             }
             $totalMasuk += $hasil['masuk'];
@@ -198,6 +200,11 @@ class ImporMassal extends BaseCommand
                     number_format((int) $r['pindah'])
                 ));
             }
+        }
+
+        if ($berkasGagal > 0) {
+            CLI::error(number_format($berkasGagal) . ' berkas gagal diproses atau dilewati. Periksa pesan di atas; perintah mengembalikan status gagal.');
+            return EXIT_ERROR;
         }
 
         return EXIT_SUCCESS;
