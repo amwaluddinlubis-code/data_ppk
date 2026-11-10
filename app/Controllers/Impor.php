@@ -180,6 +180,7 @@ class Impor extends BaseController
             // ID tidak diisi dari berkas: kini AUTO_INCREMENT.
             unset($row['ID']);
             $row['TGL_COKLIT'] = $this->normalisasiTanggal($row['TGL_COKLIT']);
+            $row['TGL_LAHIR']  = \App\Libraries\ImporCoklit::tanggalLahirIso($row['TGLLHR'] ?? null);
 
             $kecBerkas = $row['KEC'] !== null ? strtoupper(trim((string) $row['KEC'])) : '';
             if ($kecBerkas !== '' && $kecBerkas !== strtoupper($target)) {

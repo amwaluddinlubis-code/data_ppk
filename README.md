@@ -331,3 +331,21 @@ manual:
 Pemasangan di komputer baru sama seperti sebelumnya: salin `.env`,
 jalankan `php spark migrate`, buat admin awal lewat
 `php spark db:seed PenggunaAwalSeeder`.
+
+### Skema Konsolidasi 2026 (basis data baru)
+
+Sejak 10 November 2026, `php spark migrate` pada basis data KOSONG
+langsung membentuk struktur akhir — tanpa objek warisan:
+
+- 7 tabel (`mhc`, `tms8`, `users`, `riwayat_perubahan`, `impor_log`,
+  `akses_log`, `migrations`) + 7 view aplikasi.
+- `mhc`: `ID` kunci pokok auto-increment; `NIK_AKTIF` ter-generate +
+  indeks unik (satu NIK satu baris aktif); indeks wilayah
+  (KEC, DESA, TPS, KET) & (KET, KEC); kolom inti NOT NULL; kolom
+  `TGL_LAHIR` bertipe DATE yang diisi otomatis dari teks `TGLLHR`
+  saat impor dan entri.
+- Migration lama menjadi rintisan kosong (riwayat versi lama tetap
+  terbaca); basis data lama disamakan bentuknya oleh migration
+  penyesuai 2026-11-10-230000 dalam satu kali `spark migrate` —
+  termasuk pengisian `TGL_LAHIR` dari data yang sudah ada dan
+  pengarsipan objek warisan menjadi tabel `arsip_*`.

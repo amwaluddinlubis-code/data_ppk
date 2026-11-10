@@ -153,6 +153,7 @@ class Coklit extends BaseController
                 ->with('galat', implode(' ', $galat));
         }
 
+        $bersih['TGL_LAHIR'] = \App\Libraries\ImporCoklit::tanggalLahirIso($bersih['TGLLHR'] ?? null);
         $db  = $this->db();
         $uid = strtoupper(bin2hex(random_bytes(8)));
         $bersih['UID'] = $uid;
@@ -213,6 +214,7 @@ class Coklit extends BaseController
                 ->with('galat', implode(' ', $galat));
         }
 
+        $bersih['TGL_LAHIR']   = \App\Libraries\ImporCoklit::tanggalLahirIso($bersih['TGLLHR'] ?? null);
         $bersih['LAST_UPDATE'] = date('Y-m-d H:i:s');
 
         $db = $this->db();

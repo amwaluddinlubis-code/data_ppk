@@ -337,6 +337,9 @@ class ImporMassal extends BaseCommand
                 if ($format === 'sidalih') {
                     $row['LAST_UPDATE'] = ImporCoklit::normalisasiTanggal($row['LAST_UPDATE']);
                 }
+                if (empty($row['TGL_LAHIR'])) {
+                    $row['TGL_LAHIR'] = ImporCoklit::tanggalLahirIso($row['TGLLHR']);
+                }
 
                 if (Keterangan::isMs($ket)) {
                     if (isset($this->nikAktifAda[$nik])) {

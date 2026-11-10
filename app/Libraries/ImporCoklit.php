@@ -23,7 +23,7 @@ final class ImporCoklit
 {
     /** @var list<string> Semua kolom tabel mhc, urut skema. */
     public const KOLOM_MHC = [
-        'UID', 'ID', 'NKK', 'NIK', 'NAMA', 'TMPTLHR', 'TGLLHR', 'STATUS',
+        'UID', 'ID', 'NKK', 'NIK', 'NAMA', 'TMPTLHR', 'TGLLHR', 'TGL_LAHIR', 'STATUS',
         'JENIS_KELAMIN', 'ALAMAT', 'RT', 'RW', 'DISABILITAS', 'EKTP', 'KET',
         'SUMBER', 'TPS', 'LAST_UPDATE', 'LAT', 'LONG', 'PROV', 'KAB', 'KEC',
         'DESA', 'TGL_COKLIT',
@@ -119,6 +119,36 @@ final class ImporCoklit
     }
 
     /** Normalisasi tanggal Excel (nomor seri) / teks menjadi Y-m-d. */
+    /**
+     * Ubah teks tanggal lahir (DD|MM|YYYY, DD-MM-YYYY, DD/MM/YYYY,
+     * atau ISO) menjadi tanggal ISO untuk kolom DATE TGL_LAHIR.
+     * Penguraian eksplisit per bagian — BUKAN strtotime, yang akan
+     * membaca DD-MM-YYYY secara Amerika (bulan-tanggal tertukar).
+     * Mengembalikan null bila pola tidak dikenal/tidak sah.
+     */
+    public static function tanggalLahirIso($nilai): ?string
+    {
+        if ($nilai === null) {
+            return null;
+        }
+        $s = trim((string) $nilai);
+        if ($s === '') {
+            return null;
+        }
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $s, $m)) {
+            return checkdate((int) $m[2], (int) $m[3], (int) $m[1]) ? $s : null;
+        }
+        if (preg_match('/^(\d{1,2})[|\/-](\d{1,2})[|\/-](\d{4})$/', $s, $m)) {
+            $d  = (int) $m[1];
+            $bl = (int) $m[2];
+            $th = (int) $m[3];
+
+            return checkdate($bl, $d, $th) ? sprintf('%04d-%02d-%02d', $th, $bl, $d) : null;
+        }
+
+        return null;
+    }
+
     public static function normalisasiTanggal($nilai): ?string
     {
         if ($nilai === null || $nilai === '') {

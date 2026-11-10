@@ -5,63 +5,27 @@ namespace App\Database\Migrations;
 use CodeIgniter\Database\Migration;
 
 /**
- * Fase 5 — Log akses data sensitif.
+ * RINTISAN KOSONG — migration lama yang sudah digantikan.
  *
- * Mencatat masuk/keluar, cetak & unduh daftar pemilih, pembuatan
- * cadangan, dan pergantian kecamatan aktif (Fase 6). Tabel ini hanya
- * ada di basis data UTAMA (grup 'default') — penulisan selalu memakai
- * koneksi 'default' secara eksplisit (lihat BaseController::catatAkses).
+ * Sejak Skema Konsolidasi 2026 (migration 2026-11-10-200000 s.d.
+ * 230000), struktur basis data ditetapkan langsung dalam bentuk
+ * akhirnya oleh migration-migration baru. Berkas ini sengaja
+ * dikosongkan agar:
+ * - basis data BARU tidak lagi membentuk objek warisan, dan
+ * - basis data LAMA yang sudah mencatat versi ini tidak terganggu.
+ *
+ * Jangan dihapus: penghapusan berkas migration yang sudah tercatat
+ * dapat membingungkan riwayat migrasi pada basis data lama.
  */
 class LogAkses extends Migration
 {
-    protected $DBGroup = 'default';
-
     public function up()
     {
-        $this->forge->addField([
-            'id' => [
-                'type'           => 'INT',
-                'constraint'     => 11,
-                'unsigned'       => true,
-                'auto_increment' => true,
-            ],
-            'pengguna_id' => [
-                'type'       => 'INT',
-                'constraint' => 11,
-                'unsigned'   => true,
-                'null'       => true,
-            ],
-            'pengguna_username' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 50,
-                'null'       => true,
-            ],
-            'aksi' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 50,
-            ],
-            'detail' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 255,
-                'null'       => true,
-            ],
-            'ip_address' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 45,
-                'null'       => true,
-            ],
-            'created_at' => [
-                'type' => 'DATETIME',
-                'null' => true,
-            ],
-        ]);
-        $this->forge->addKey('id', true);
-        $this->forge->addKey('created_at');
-        $this->forge->createTable('akses_log');
+        // Digantikan Skema Konsolidasi 2026.
     }
 
     public function down()
     {
-        $this->forge->dropTable('akses_log');
+        // Digantikan Skema Konsolidasi 2026.
     }
 }
