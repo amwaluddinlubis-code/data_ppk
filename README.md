@@ -387,4 +387,4 @@ Langkah basis data baru: buat basis data kosong → arahkan `.env` →
 
 ### Skrip impor Windows (`impor_madina.bat`)
 
-Skrip ini mencatat keluaran proses ke `hasil_impor.txt` dan meneruskan kode keluar proses impor ke pemanggil. Jika migrasi, penyiapan akun admin, atau impor gagal, skrip berakhir dengan kode non-nol; jangan menganggap proses berhasil hanya karena jendela menampilkan log. Periksa `hasil_impor.txt` untuk pesan kegagalan.
+Skrip ini mencatat keluaran proses ke `hasil_impor.txt` dan meneruskan kode keluar proses impor ke pemanggil. Jika migrasi, penyiapan akun admin, atau impor gagal, skrip berakhir dengan kode non-nol; jangan menganggap proses berhasil hanya karena jendela menampilkan log. Perintah `impor:massal` juga mengembalikan status gagal bila satu atau lebih berkas tidak dapat diproses, sehingga kegagalan tingkat berkas tidak tertutup oleh keberhasilan berkas lain. Periksa `hasil_impor.txt` untuk pesan kegagalan.
