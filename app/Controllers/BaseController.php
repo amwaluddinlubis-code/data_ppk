@@ -108,6 +108,116 @@ abstract class BaseController extends Controller
         return Wilayah::saringId($builder, $kolomKelurahan);
     }
 
+    // -- Tabel HTMX (pola bersama sejak konversi HTMX 10 Nov 2026) -----
+
+    /**
+     * Nomor TPS yang benar-benar ada pada data sesuai desa/sumber,
+     * tercakup wilayah pengguna. Sumber adalah nama halaman daftar
+     * ('aktif', 'baru', 'tersaring', 'pindah') atau lainnya untuk
+     * tabel induk mhc.
+     *
+     * @return list<string>
+     */
+    protected function daftarTpsDari(string $desa, string $sumber): array
+    {
+        $db = db_connect();
+
+        // Halaman daftar memakai view yang berbeda-beda; TPS harus
+        // diambil dari view yang sama agar nomor yang ditawarkan
+        // benar-benar menghasilkan baris pada halaman itu.
+        $view = [
+            'aktif'    => 'pemilih_active',
+            'baru'     => 'pemilihbaru2',
+            'tersaring' => 'tersaring',
+            'pindah'   => 'pindahtps',
+        ][$sumber] ?? null;
+
+        if ($view !== null) {
+            $builder = $db->table($view)->distinct()->select('TPS');
+            $this->saringWilayah($builder);
+            if ($desa !== '') {
+                $builder->where('DESA', $desa);
+            }
+            $rows = $builder->orderBy('CAST(TPS AS UNSIGNED)', 'ASC', false)
+                ->get()->getResultArray();
+        } else {
+            $builder = $db->table('mhc')->distinct()->select('mhc.TPS')
+                ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id');
+            $this->saringWilayahId($builder);
+            if ($desa !== '') {
+                $kel = $db->table('kelurahan')->select('kelurahan.id AS id')
+                    ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+                    ->where('kelurahan.nama', $desa);
+                $kecId = \App\Libraries\Wilayah::kecEfektifId();
+                if ($kecId !== null) {
+                    $kel->where('kelurahan.kecamatan_id', $kecId);
+                }
+                $ids = array_map(
+                    static fn ($r) => (int) $r['id'],
+                    $kel->get()->getResultArray()
+                );
+                $builder->whereIn('mhc.kelurahan_id', $ids === [] ? [-1] : $ids);
+            }
+            $rows = $builder->orderBy('CAST(mhc.TPS AS UNSIGNED)', 'ASC', false)
+                ->get()->getResultArray();
+        }
+
+        $daftar = [];
+        foreach ($rows as $r) {
+            $tps = trim((string) ($r['TPS'] ?? ''));
+            if ($tps !== '') {
+                $daftar[] = $tps;
+            }
+        }
+
+        return array_values(array_unique($daftar));
+    }
+
+    /**
+     * Ambil satu halaman dari builder yang sudah tersaring & terurut:
+     * hitung total, jepit nomor halaman, lalu ambil barisnya.
+     *
+     * @return array{0: list<array<string, mixed>>, 1: int, 2: int, 3: int}
+     *               [baris, total, halaman, totalHalaman]
+     */
+    protected function halamanTabel($builder, int $halaman, int $perHal): array
+    {
+        $perHal   = max(1, $perHal);
+        $total    = $builder->countAllResults(false);
+        $totalHal = max(1, (int) ceil($total / $perHal));
+        $halaman  = min(max(1, $halaman), $totalHal);
+        $rows     = $builder->get($perHal, ($halaman - 1) * $perHal)->getResultArray();
+
+        return [$rows, $total, $halaman, $totalHal];
+    }
+
+    /**
+     * Samarkan kolom-kolom sensitif pada baris hasil bila peran yang
+     * masuk adalah Pemeriksa (padanan samarkanUntukPemeriksa untuk
+     * keluaran partial HTMX berbentuk larik).
+     *
+     * @param list<array<string, mixed>> $rows
+     * @param list<string>               $kolom
+     * @return list<array<string, mixed>>
+     */
+    protected function samarkanBarisPemeriksa(array $rows, array $kolom): array
+    {
+        if (session()->get('pengguna_peran') !== 'viewer') {
+            return $rows;
+        }
+        foreach ($rows as &$r) {
+            foreach ($kolom as $k) {
+                if (array_key_exists($k, $r)) {
+                    $r[$k] = $this->samarkanNomor($r[$k]);
+                }
+            }
+        }
+        unset($r);
+
+        return $rows;
+    }
+
     // -- Daftar wilayah (dari tabel master) ---------------------------
 
     /** @return list<string> Daftar nama kecamatan pada tabel master. */

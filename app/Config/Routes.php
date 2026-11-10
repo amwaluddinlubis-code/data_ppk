@@ -53,18 +53,22 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     // Pemilih Pindah TPS
     $routes->get('pemilih', 'Pemilih::index');
     $routes->post('pemilih/pindahTPS', 'Pemilih::pindahTPS');
+    $routes->get('pemilih/tabelPindah', 'Pemilih::tabelPindah');
 
     // Pemilih Baru
     $routes->get('pemilih/baru', 'Pemilih::baru');
     $routes->post('pemilih/getPemilihBaru', 'Pemilih::getPemilihBaru');
+    $routes->get('pemilih/tabelBaru', 'Pemilih::tabelBaru');
 
     // Pemilih Tersaring (TMS)
     $routes->get('pemilih/tersaring', 'Pemilih::tersaring');
     $routes->post('pemilih/getPemilihTersaring', 'Pemilih::getPemilihTersaring');
+    $routes->get('pemilih/tabelTersaring', 'Pemilih::tabelTersaring');
 
     // Pemilih Aktif / Memenuhi Syarat + Cetak
     $routes->get('pemilih/aktifPrint', 'Pemilih::aktifPrint');
     $routes->post('pemilih/aktif', 'Pemilih::aktif');
+    $routes->get('pemilih/tabelAktif', 'Pemilih::tabelAktif');
     $routes->get('pemilih/ms', 'Pemilih::ms');
     $routes->post('pemilih/ms', 'Pemilih::ms');
     $routes->get('pemilih/ms-pdf', 'Pemilih::msPdf');
@@ -87,9 +91,14 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('residu', 'Residu::index');
     $routes->post('residu/getGanda', 'Residu::getGanda');
     $routes->post('residu/getPeringatan', 'Residu::getPeringatan');
+    $routes->get('residu/tabelGanda', 'Residu::tabelGanda');
+    $routes->get('residu/tabelPeringatan', 'Residu::tabelPeringatan');
     $routes->get('anomali', 'Anomali::index');
     $routes->post('anomali/getTerselubung', 'Anomali::getTerselubung');
     $routes->post('anomali/getKkTersebar', 'Anomali::getKkTersebar');
     $routes->post('anomali/getUmur', 'Anomali::getUmur');
+    $routes->get('anomali/tabelTerselubung', 'Anomali::tabelTerselubung');
+    $routes->get('anomali/tabelKk', 'Anomali::tabelKk');
+    $routes->get('anomali/tabelUmur', 'Anomali::tabelUmur');
     $routes->post('anomali/acuan', 'Anomali::simpanAcuan');
 });

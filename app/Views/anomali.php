@@ -32,28 +32,25 @@
     </div>
 </div>
 
-<div class="card bg-base-100 shadow mb-4">
+<div class="card bg-base-100 shadow mb-4" x-data="{ memuat: false }"
+     @htmx:before-request="memuat = true" @htmx:after-request="memuat = false">
     <div class="card-body p-4">
-        <div class="text-sm font-bold mb-2">DUPLIKAT TERSELUBUNG — NAMA & TANGGAL LAHIR SAMA, NIK BERBEDA</div>
-        <div class="overflow-x-auto">
-            <table id="terselubung" class="table table-zebra table-sm w-full">
-                <thead>
-                    <tr>
-                        <th>NO</th>
-                        <th>NIK</th>
-                        <th>NKK</th>
-                        <th>NAMA</th>
-                        <th>TGL LAHIR</th>
-                        <th>L/P</th>
-                        <th>KECAMATAN</th>
-                        <th>DESA</th>
-                        <th>TPS</th>
-                        <th>KETERANGAN</th>
-                        <th>SUMBER</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div class="flex flex-wrap items-center gap-3 mb-2">
+            <div class="text-sm font-bold">DUPLIKAT TERSELUBUNG — NAMA & TANGGAL LAHIR SAMA, NIK BERBEDA</div>
+            <span class="badge badge-info badge-sm" x-show="memuat" x-cloak>
+                <span class="loading loading-spinner loading-xs"></span> Memuat…
+            </span>
+        </div>
+        <div class="flex flex-wrap items-end gap-3 mb-3">
+            <label class="form-control w-full sm:w-56">
+                <span class="label"><span class="label-text font-semibold">CARI</span></span>
+                <input type="text" class="input input-bordered input-sm" name="cari_terselubung" placeholder="Nama / NIK / NKK…"
+                       hx-get="<?= base_url('anomali/tabelTerselubung') ?>" hx-target="#wadah-terselubung" hx-swap="innerHTML"
+                       hx-trigger="input changed delay:500ms">
+            </label>
+        </div>
+        <div id="wadah-terselubung">
+            <?= view('anomali/_tabel_terselubung', $tabelTerselubungAwal) ?>
         </div>
         <p class="text-xs opacity-60 mt-2">Hanya baris <strong>aktif (MS)</strong> yang dinilai. Pola ini tidak tertangkap Analisis NIK Ganda karena NIK-nya memang berbeda — penyebab tersering adalah salah ketik NIK saat coklit, tetapi bisa juga dua orang berbeda (misalnya kembar dengan nama mirip), jadi perlakukan sebagai <strong>bahan pemeriksaan</strong>, bukan vonis ganda. Kelompok yang tampil dibatasi pada yang menyentuh wilayah Anda, dan semua baris kelompok itu ditampilkan agar mudah dikoordinasikan.</p>
     </div>
@@ -65,31 +62,23 @@
         <div class="flex flex-wrap items-end gap-3 mb-3">
             <label class="form-control w-full sm:w-64">
                 <span class="label"><span class="label-text font-semibold">KATEGORI</span></span>
-                <select class="select select-bordered select-sm" id="kategoriKk">
+                <select class="select select-bordered select-sm" id="kategoriKk" name="kategori"
+                        hx-get="<?= base_url('anomali/tabelKk') ?>" hx-target="#wadah-kk" hx-swap="innerHTML"
+                        hx-trigger="change" hx-include="[name='cari_kk']">
                     <option value="">SEMUA KATEGORI</option>
                     <option value="desa">ANTAR DESA</option>
                     <option value="tps">BEDA TPS (SATU DESA)</option>
                 </select>
             </label>
+            <label class="form-control w-full sm:w-56">
+                <span class="label"><span class="label-text font-semibold">CARI</span></span>
+                <input type="text" class="input input-bordered input-sm" name="cari_kk" placeholder="Nama / NIK / NKK…"
+                       hx-get="<?= base_url('anomali/tabelKk') ?>" hx-target="#wadah-kk" hx-swap="innerHTML"
+                       hx-trigger="input changed delay:500ms" hx-include="#kategoriKk">
+            </label>
         </div>
-        <div class="overflow-x-auto">
-            <table id="kk" class="table table-zebra table-sm w-full">
-                <thead>
-                    <tr>
-                        <th>NO</th>
-                        <th>NKK</th>
-                        <th>NIK</th>
-                        <th>NAMA</th>
-                        <th>L/P</th>
-                        <th>KECAMATAN</th>
-                        <th>DESA</th>
-                        <th>TPS</th>
-                        <th>KETERANGAN</th>
-                        <th>KATEGORI</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div id="wadah-kk">
+            <?= view('anomali/_tabel_kk', $tabelKkAwal) ?>
         </div>
         <p class="text-xs opacity-60 mt-2">Hanya anggota <strong>aktif (MS)</strong> yang dihitung. KK yang tersebar menyulitkan pemilih pada hari pemungutan dan rawan keberatan, jadi daftar ini bahan penataan TPS dan koordinasi dengan PPS setempat. Kelompok yang tampil dibatasi pada yang menyentuh wilayah Anda; seluruh anggota KK itu ditampilkan.</p>
     </div>
@@ -116,33 +105,23 @@
         <div class="flex flex-wrap items-end gap-3 mb-3">
             <label class="form-control w-full sm:w-64">
                 <span class="label"><span class="label-text font-semibold">KATEGORI UMUR</span></span>
-                <select class="select select-bordered select-sm" id="kategoriUmur">
+                <select class="select select-bordered select-sm" id="kategoriUmur" name="kategori"
+                        hx-get="<?= base_url('anomali/tabelUmur') ?>" hx-target="#wadah-umur" hx-swap="innerHTML"
+                        hx-trigger="change" hx-include="[name='cari_umur']">
                     <option value="">SEMUA KATEGORI</option>
                     <option value="atas">DI ATAS 100 TAHUN</option>
                     <option value="bawah">DI BAWAH 17 TAHUN</option>
                 </select>
             </label>
+            <label class="form-control w-full sm:w-56">
+                <span class="label"><span class="label-text font-semibold">CARI</span></span>
+                <input type="text" class="input input-bordered input-sm" name="cari_umur" placeholder="Nama / NIK / NKK…"
+                       hx-get="<?= base_url('anomali/tabelUmur') ?>" hx-target="#wadah-umur" hx-swap="innerHTML"
+                       hx-trigger="input changed delay:500ms" hx-include="#kategoriUmur">
+            </label>
         </div>
-        <div class="overflow-x-auto">
-            <table id="umur" class="table table-zebra table-sm w-full">
-                <thead>
-                    <tr>
-                        <th>NO</th>
-                        <th>NIK</th>
-                        <th>NKK</th>
-                        <th>NAMA</th>
-                        <th>TGL LAHIR</th>
-                        <th>L/P</th>
-                        <th>KECAMATAN</th>
-                        <th>DESA</th>
-                        <th>TPS</th>
-                        <th>KETERANGAN</th>
-                        <th>UMUR</th>
-                        <th>KATEGORI</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div id="wadah-umur">
+            <?= view('anomali/_tabel_umur', $tabelUmurAwal) ?>
         </div>
     </div>
 </div>
@@ -213,85 +192,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
-function loadTerselubung() {
-    $('#terselubung').DataTable({
-        processing: true,
-        serverSide: true,
-        order: [],
-        ajax: {
-            url: "<?= base_url('anomali/getTerselubung') ?>",
-            type: 'post'
-        },
-        columnDefs: [
-            { targets: 0, orderable: false }
-        ]
-    });
-}
-
-function loadKk() {
-    $('#kk').DataTable({
-        processing: true,
-        serverSide: true,
-        order: [],
-        ajax: {
-            url: "<?= base_url('anomali/getKkTersebar') ?>",
-            type: 'post',
-            data: function (d) {
-                d.kategori = $('#kategoriKk').val();
-            }
-        },
-        columnDefs: [
-            { targets: 0, orderable: false },
-            {
-                targets: 9,
-                orderable: false,
-                render: function (data) {
-                    return data === 'Antar Desa'
-                        ? '<span class="badge badge-error badge-sm">Antar Desa</span>'
-                        : '<span class="badge badge-info badge-sm">Beda TPS</span>';
-                }
-            }
-        ]
-    });
-}
-
-function loadUmur() {
-    $('#umur').DataTable({
-        processing: true,
-        serverSide: true,
-        order: [],
-        ajax: {
-            url: "<?= base_url('anomali/getUmur') ?>",
-            type: 'post',
-            data: function (d) {
-                d.kategori = $('#kategoriUmur').val();
-            }
-        },
-        columnDefs: [
-            { targets: 0, orderable: false },
-            { targets: 10, orderable: false },
-            {
-                targets: 11,
-                orderable: false,
-                render: function (data) {
-                    return data === 'Di Atas 100 Tahun'
-                        ? '<span class="badge badge-error badge-sm">Di Atas 100 Tahun</span>'
-                        : '<span class="badge badge-warning badge-sm">Di Bawah 17 Tahun</span>';
-                }
-            }
-        ]
-    });
-}
-
-$(document).ready(function () {
-    loadTerselubung();
-    loadKk();
-    loadUmur();
-    $('#kategoriKk').on('change', function () {
-        $('#kk').DataTable().ajax.reload();
-    });
-    $('#kategoriUmur').on('change', function () {
-        $('#umur').DataTable().ajax.reload();
-    });
-});
+// Ketiga tabel halaman ini memakai HTMX (partial server-side).
 <?= $this->endSection() ?>

@@ -25,37 +25,32 @@
     </div>
 </div>
 
-<div class="card bg-base-100 shadow">
+<div class="card bg-base-100 shadow" x-data="{ memuat: false }"
+     @htmx:before-request="memuat = true" @htmx:after-request="memuat = false">
     <div class="card-body p-4">
         <div class="flex flex-wrap items-end gap-3 mb-3">
             <label class="form-control w-full sm:w-64">
                 <span class="label"><span class="label-text font-semibold">KATEGORI KEGANDAAN</span></span>
-                <select class="select select-bordered select-sm" id="kategori">
+                <select class="select select-bordered select-sm" id="kategori" name="kategori"
+                        hx-get="<?= base_url('residu/tabelGanda') ?>" hx-target="#wadah-ganda" hx-swap="innerHTML"
+                        hx-trigger="change" hx-include="[name='cari_ganda']">
                     <option value="">SEMUA KATEGORI</option>
                     <option value="kecamatan">ANTAR KECAMATAN</option>
                     <option value="desa">ANTAR DESA</option>
                 </select>
             </label>
+            <label class="form-control w-full sm:w-56">
+                <span class="label"><span class="label-text font-semibold">CARI</span></span>
+                <input type="text" class="input input-bordered input-sm" name="cari_ganda" placeholder="Nama / NIK / NKK…"
+                       hx-get="<?= base_url('residu/tabelGanda') ?>" hx-target="#wadah-ganda" hx-swap="innerHTML"
+                       hx-trigger="input changed delay:500ms" hx-include="[name='kategori']">
+            </label>
+            <span class="badge badge-info badge-sm" x-show="memuat" x-cloak>
+                <span class="loading loading-spinner loading-xs"></span> Memuat…
+            </span>
         </div>
-        <div class="overflow-x-auto">
-            <table id="ganda" class="table table-zebra table-sm w-full">
-                <thead>
-                    <tr>
-                        <th>NO</th>
-                        <th>NIK</th>
-                        <th>NKK</th>
-                        <th>NAMA</th>
-                        <th>L/P</th>
-                        <th>KECAMATAN</th>
-                        <th>DESA</th>
-                        <th>TPS</th>
-                        <th>KETERANGAN</th>
-                        <th>SUMBER</th>
-                        <th>KATEGORI</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div id="wadah-ganda">
+            <?= view('residu/_tabel_ganda', $tabelGandaAwal) ?>
         </div>
         <p class="text-xs opacity-60 mt-2">Analisis ini hanya memperhatikan <strong>NIK</strong> pada seluruh data coklit: setiap NIK yang tercatat di lebih dari satu desa/kelurahan atau kecamatan dikelompokkan di sini, dan <strong>semua baris</strong> NIK itu ditampilkan (termasuk baris di wilayah seberang) agar mudah dikoordinasikan. Kegandaan di dalam desa yang sama tidak ditampilkan karena merupakan pola normal coklit (baris tersaring + baris baru orang yang sama). Kelompok yang tampil dibatasi pada yang menyentuh wilayah Anda.</p>
     </div>
@@ -68,89 +63,21 @@
             <div class="badge badge-warning badge-lg"><?= number_format($jmlPeringatan, 0, ',', '.') ?> pemilih</div>
         </div>
         <p class="text-xs opacity-70 mb-3">Jenis kelamin yang tercatat berbeda dengan kode pada NIK — pada NIK, perempuan dikodekan sebagai tanggal lahir ditambah 40. Ini <strong>hanya peringatan</strong>: perbedaan seperti ini sering berasal dari data Dukcapil dan belum tentu datanya salah. Gunakan sebagai bahan klarifikasi, dan jangan mengubah data hanya berdasarkan peringatan ini.</p>
-        <div class="overflow-x-auto">
-            <table id="peringatan" class="table table-zebra table-sm w-full">
-                <thead>
-                    <tr>
-                        <th>NO</th>
-                        <th>NIK</th>
-                        <th>NKK</th>
-                        <th>NAMA</th>
-                        <th>TERCATAT</th>
-                        <th>MENURUT NIK</th>
-                        <th>KECAMATAN</th>
-                        <th>DESA</th>
-                        <th>TPS</th>
-                        <th>KETERANGAN</th>
-                        <th>TANDA</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div class="flex flex-wrap items-end gap-3 mb-3">
+            <label class="form-control w-full sm:w-56">
+                <span class="label"><span class="label-text font-semibold">CARI</span></span>
+                <input type="text" class="input input-bordered input-sm" name="cari_peringatan" placeholder="Nama / NIK / NKK…"
+                       hx-get="<?= base_url('residu/tabelPeringatan') ?>" hx-target="#wadah-peringatan" hx-swap="innerHTML"
+                       hx-trigger="input changed delay:500ms">
+            </label>
+        </div>
+        <div id="wadah-peringatan">
+            <?= view('residu/_tabel_peringatan', $tabelPeringatanAwal) ?>
         </div>
     </div>
 </div>
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
-function loadData() {
-    if ($.fn.DataTable.isDataTable('#ganda')) {
-        $('#ganda').DataTable().destroy();
-    }
-    $('#ganda').DataTable({
-        processing: true,
-        serverSide: true,
-        order: [],
-        ajax: {
-            url: "<?= base_url('residu/getGanda') ?>",
-            type: 'post',
-            data: function (d) {
-                d.kategori = $('#kategori').val();
-            }
-        },
-        columnDefs: [
-            { targets: 0, orderable: false },
-            {
-                targets: 10,
-                orderable: false,
-                render: function (data) {
-                    return data === 'Antar Kecamatan'
-                        ? '<span class="badge badge-error badge-sm">Antar Kecamatan</span>'
-                        : '<span class="badge badge-info badge-sm">Antar Desa</span>';
-                }
-            }
-        ]
-    });
-}
-
-function loadPeringatan() {
-    $('#peringatan').DataTable({
-        processing: true,
-        serverSide: true,
-        order: [],
-        ajax: {
-            url: "<?= base_url('residu/getPeringatan') ?>",
-            type: 'post'
-        },
-        columnDefs: [
-            { targets: 0, orderable: false },
-            { targets: 5, orderable: false },
-            {
-                targets: 10,
-                orderable: false,
-                render: function (data) {
-                    return '<span class="badge badge-warning badge-sm">' + data + '</span>';
-                }
-            }
-        ]
-    });
-}
-
-$(document).ready(function () {
-    loadData();
-    loadPeringatan();
-    $('#kategori').on('change', function () {
-        $('#ganda').DataTable().ajax.reload();
-    });
-});
+// Kedua tabel halaman ini memakai HTMX (partial server-side).
 <?= $this->endSection() ?>

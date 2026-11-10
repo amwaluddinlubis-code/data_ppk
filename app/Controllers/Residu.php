@@ -36,6 +36,8 @@ class Residu extends BaseController
         $data['jmlKecamatan'] = count(array_filter($peta, static fn ($k) => $k === 'kecamatan'));
         $data['jmlDesa']      = count(array_filter($peta, static fn ($k) => $k === 'desa'));
         $data['jmlPeringatan'] = $this->hitungPeringatanGender();
+        $data['tabelGandaAwal']      = $this->dataGanda([]);
+        $data['tabelPeringatanAwal'] = $this->dataPeringatan([]);
         return view('ganda', $data);
     }
 
@@ -155,6 +157,114 @@ class Residu extends BaseController
         // Kolom: 0 No, 1 NIK, 2 NKK, 3 Nama, 4 Tercatat, 5 Menurut NIK,
         // 6 Kecamatan, 7 Desa, 8 TPS, 9 Keterangan, 10 Tanda.
         return $this->samarkanUntukPemeriksa($json, [1, 2]);
+    }
+
+    // -- Tabel HTMX (konversi dari DataTables, 10 Nov 2026) -------------
+
+    /** @param array<string, mixed> $param */
+    private function dataGanda(array $param): array
+    {
+        $p = array_merge(['kategori' => '', 'cari' => '', 'hal' => 1, 'perhal' => 10], $param);
+        $perHal = in_array((int) $p['perhal'], [10, 25, 50, 100], true) ? (int) $p['perhal'] : 10;
+        $db   = db_connect();
+        $peta = $this->petaGanda();
+
+        $niks = [];
+        foreach ($peta as $nik => $kat) {
+            if ($p['kategori'] === '' || $kat === $p['kategori']) {
+                $niks[] = $nik;
+            }
+        }
+
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET, mhc.SUMBER', false)
+            ->orderBy('mhc.NIK', 'ASC')
+            ->orderBy('KEC', 'ASC')
+            ->orderBy('DESA', 'ASC')
+            ->orderBy('mhc.TPS', 'ASC');
+        if ($niks === []) {
+            $builder->where('1 = 0', null, false);
+        } else {
+            $builder->whereIn('NIK', $niks);
+        }
+        if ($p['cari'] !== '') {
+            $builder->groupStart()->like('mhc.NAMA', $p['cari'])
+                ->orLike('mhc.NIK', $p['cari'])->orLike('mhc.NKK', $p['cari'])->groupEnd();
+        }
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], $perHal);
+        $label = \App\Libraries\Keterangan::daftar();
+        foreach ($rows as &$r) {
+            $r['KET_LABEL'] = $label[(string) $r['KET']] ?? (string) $r['KET'];
+            $r['KATEGORI']  = ($peta[$r['NIK']] ?? 'desa') === 'kecamatan' ? 'Antar Kecamatan' : 'Antar Desa';
+        }
+        unset($r);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NIK', 'NKK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => $perHal,
+            'saring' => ['kategori' => $p['kategori'], 'cari' => $p['cari']],
+            'urlTabel' => base_url('residu/tabelGanda'), 'target' => '#wadah-ganda',
+        ];
+    }
+
+    /** @param array<string, mixed> $param */
+    private function dataPeringatan(array $param): array
+    {
+        $p = array_merge(['cari' => '', 'hal' => 1, 'perhal' => 10], $param);
+        $perHal = in_array((int) $p['perhal'], [10, 25, 50, 100], true) ? (int) $p['perhal'] : 10;
+        $db      = db_connect();
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
+            ->where($this->kondisiGender('mhc'), null, false)
+            ->orderBy('KEC', 'ASC')
+            ->orderBy('DESA', 'ASC')
+            ->orderBy('mhc.NAMA', 'ASC');
+        \App\Libraries\Wilayah::saringId($builder);
+        if ($p['cari'] !== '') {
+            $builder->groupStart()->like('mhc.NAMA', $p['cari'])
+                ->orLike('mhc.NIK', $p['cari'])->orLike('mhc.NKK', $p['cari'])->groupEnd();
+        }
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], $perHal);
+        $label = \App\Libraries\Keterangan::daftar();
+        $jk    = ['L' => 'Laki-laki', 'P' => 'Perempuan'];
+        foreach ($rows as &$r) {
+            $r['TERCATAT']   = $jk[(string) $r['JENIS_KELAMIN']] ?? (string) $r['JENIS_KELAMIN'];
+            $r['MENURUT']    = ((int) substr((string) $r['NIK'], 6, 2)) > 40 ? 'Perempuan' : 'Laki-laki';
+            $r['KET_LABEL']  = $label[(string) $r['KET']] ?? (string) $r['KET'];
+        }
+        unset($r);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NIK', 'NKK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => $perHal,
+            'saring' => ['cari' => $p['cari']],
+            'urlTabel' => base_url('residu/tabelPeringatan'), 'target' => '#wadah-peringatan',
+        ];
+    }
+
+    public function tabelGanda()
+    {
+        return view('residu/_tabel_ganda', $this->dataGanda([
+            'kategori' => trim((string) $this->request->getGet('kategori')),
+            'cari'     => trim((string) ($this->request->getGet('cari') ?? $this->request->getGet('cari_ganda'))),
+            'hal'      => (int) $this->request->getGet('hal'),
+            'perhal'   => (int) $this->request->getGet('perhal'),
+        ]));
+    }
+
+    public function tabelPeringatan()
+    {
+        return view('residu/_tabel_peringatan', $this->dataPeringatan([
+            'cari'   => trim((string) ($this->request->getGet('cari') ?? $this->request->getGet('cari_peringatan'))),
+            'hal'    => (int) $this->request->getGet('hal'),
+            'perhal' => (int) $this->request->getGet('perhal'),
+        ]));
     }
 
     /**

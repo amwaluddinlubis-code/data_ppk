@@ -233,58 +233,7 @@ class Dashboard extends BaseController
     /** @return list<string> Nomor TPS yang ada pada data sesuai desa/sumber. */
     private function ambilDaftarTps(string $desa, string $sumber): array
     {
-        $db = db_connect();
-
-        // Halaman daftar memakai view yang berbeda-beda; TPS harus
-        // diambil dari view yang sama agar nomor yang ditawarkan
-        // benar-benar menghasilkan baris pada halaman itu.
-        $view = [
-            'aktif'    => 'pemilih_active',
-            'baru'     => 'pemilihbaru2',
-            'tersaring' => 'tersaring',
-            'pindah'   => 'pindahtps',
-        ][$sumber] ?? null;
-
-        if ($view !== null) {
-            $builder = $db->table($view)->distinct()->select('TPS');
-            $this->saringWilayah($builder);
-            if ($desa !== '') {
-                $builder->where('DESA', $desa);
-            }
-            $rows = $builder->orderBy('CAST(TPS AS UNSIGNED)', 'ASC', false)
-                ->get()->getResultArray();
-        } else {
-            $builder = $db->table('mhc')->distinct()->select('mhc.TPS')
-                ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
-                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id');
-            $this->saringWilayahId($builder);
-            if ($desa !== '') {
-                $kel = $db->table('kelurahan')->select('kelurahan.id AS id')
-                    ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
-                    ->where('kelurahan.nama', $desa);
-                $kecId = \App\Libraries\Wilayah::kecEfektifId();
-                if ($kecId !== null) {
-                    $kel->where('kelurahan.kecamatan_id', $kecId);
-                }
-                $ids = array_map(
-                    static fn ($r) => (int) $r['id'],
-                    $kel->get()->getResultArray()
-                );
-                $builder->whereIn('mhc.kelurahan_id', $ids === [] ? [-1] : $ids);
-            }
-            $rows = $builder->orderBy('CAST(mhc.TPS AS UNSIGNED)', 'ASC', false)
-                ->get()->getResultArray();
-        }
-
-        $daftar = [];
-        foreach ($rows as $r) {
-            $tps = trim((string) ($r['TPS'] ?? ''));
-            if ($tps !== '') {
-                $daftar[] = $tps;
-            }
-        }
-
-        return array_values(array_unique($daftar));
+        return $this->daftarTpsDari($desa, $sumber);
     }
 
     public function getPemilih()

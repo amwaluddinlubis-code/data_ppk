@@ -23,22 +23,38 @@ class Pemilih extends BaseController
 
     public function index()
     {
-        return view('pemilih', $this->dataHalaman('PINDAH TPS', 'DAFTAR PEMILIH PINDAH TPS'));
+        $data = $this->dataHalaman('PINDAH TPS', 'DAFTAR PEMILIH PINDAH TPS');
+        $data['tpsAwal']   = $this->daftarTpsDari('', 'pindah');
+        $data['tabelAwal'] = $this->dataPindah([]);
+
+        return view('pemilih', $data);
     }
 
     public function baru()
     {
-        return view('pemilihbaru', $this->dataHalaman('PEMILIH BARU', 'DAFTAR PEMILIH BARU'));
+        $data = $this->dataHalaman('PEMILIH BARU', 'DAFTAR PEMILIH BARU');
+        $data['tpsAwal']   = $this->daftarTpsDari('', 'baru');
+        $data['tabelAwal'] = $this->dataBaru([]);
+
+        return view('pemilihbaru', $data);
     }
 
     public function tersaring()
     {
-        return view('tersaring', $this->dataHalaman('PEMILIH TERSARING', 'DAFTAR PEMILIH TERSARING'));
+        $data = $this->dataHalaman('PEMILIH TERSARING', 'DAFTAR PEMILIH TERSARING');
+        $data['tpsAwal']   = $this->daftarTpsDari('', 'tersaring');
+        $data['tabelAwal'] = $this->dataTersaring([]);
+
+        return view('tersaring', $data);
     }
 
     public function aktifPrint()
     {
-        return view('pemilihAktif', $this->dataHalaman('CETAK DAFTAR PEMILIH MEMENUHI SYARAT', 'CETAK DAFTAR PEMILIH MEMENUHI SYARAT'));
+        $data = $this->dataHalaman('CETAK DAFTAR PEMILIH MEMENUHI SYARAT', 'CETAK DAFTAR PEMILIH MEMENUHI SYARAT');
+        $data['tpsAwal']   = $this->daftarTpsDari('', 'aktif');
+        $data['tabelAwal'] = $this->dataAktif([]);
+
+        return view('pemilihAktif', $data);
     }
 
     /** Data bersama semua halaman daftar: judul, wilayah, daftar desa. */
@@ -170,6 +186,234 @@ class Pemilih extends BaseController
             DataTable::of($builder)->addNumbering()->toJson(),
             [3, 4]
         );
+    }
+
+    // -- Tabel HTMX (konversi dari DataTables, 10 Nov 2026) -------------
+    //
+    // Setiap halaman daftar kini dirender server-side sebagai partial
+    // dan ditukar lewat HTMX. Umpan DataTables POST di atas
+    // dipertahankan untuk kompatibilitas, tetapi tidak lagi dirujuk
+    // tampilan mana pun.
+
+    /** Parameter bersama tabel HTMX dari query string. */
+    private function paramTabel(array $ekstra = []): array
+    {
+        $req    = $this->request;
+        $perHal = (int) $req->getGet('perhal');
+        $param  = [
+            'desa'  => trim((string) $req->getGet('desa')),
+            'tps'   => trim((string) $req->getGet('tps')),
+            'lp'    => trim((string) $req->getGet('lp')),
+            'cari'  => trim((string) $req->getGet('cari')),
+            'urut'  => trim((string) $req->getGet('urut')),
+            'arah'  => strtolower(trim((string) $req->getGet('arah'))) === 'desc' ? 'desc' : 'asc',
+            'hal'   => (int) $req->getGet('hal'),
+            'perhal' => in_array($perHal, [10, 25, 50, 100], true) ? $perHal : 10,
+        ];
+        foreach ($ekstra as $kunci) {
+            $param[$kunci] = trim((string) $req->getGet($kunci));
+        }
+
+        return $param;
+    }
+
+    /** Pencarian bebas gaya DataTables: cocokkan beberapa kolom (LIKE). */
+    private function terapkanCari($builder, string $cari, array $kolom): void
+    {
+        if ($cari === '') {
+            return;
+        }
+        $builder->groupStart();
+        $pertama = true;
+        foreach ($kolom as $k) {
+            if ($pertama) {
+                $builder->like($k, $cari);
+                $pertama = false;
+            } else {
+                $builder->orLike($k, $cari);
+            }
+        }
+        $builder->groupEnd();
+    }
+
+    /**
+     * Urutan tabel: kunci 'urut' dari pengguna dipetakan ke kolom yang
+     * diizinkan; tanpa kunci sah dipakai urutan bawaan halaman.
+     *
+     * @param array<string, string> $peta    kunci => ekspresi kolom
+     * @param list<string>          $bawaan  ekspresi kolom urutan bawaan
+     */
+    private function terapkanUrut($builder, string $urut, string $arah, array $peta, array $bawaan): void
+    {
+        if (isset($peta[$urut])) {
+            $builder->orderBy($peta[$urut], $arah, false);
+            return;
+        }
+        foreach ($bawaan as $kolom) {
+            $builder->orderBy($kolom, 'ASC', false);
+        }
+    }
+
+    /** @param array<string, mixed> $param */
+    private function dataAktif(array $param): array
+    {
+        $p = array_merge(['desa' => '', 'tps' => '', 'lp' => '', 'cari' => '', 'urut' => '', 'arah' => 'asc', 'hal' => 1, 'perhal' => 10], $param);
+        $builder = db_connect()->table('pemilih_active')
+            ->select('DESA, TPS, NKK, NIK, NAMA, TGLLHR, JK, UMUR, KET');
+        $this->saringWilayah($builder);
+        if ($p['desa'] !== '') {
+            $builder->where('DESA', $p['desa']);
+        }
+        if ($p['tps'] !== '') {
+            $builder->where('TPS', $p['tps']);
+        }
+        if ($p['lp'] !== '') {
+            $builder->where('JK', $p['lp']);
+        }
+        $this->terapkanCari($builder, $p['cari'], ['NAMA', 'NIK', 'NKK']);
+        $this->terapkanUrut($builder, $p['urut'], $p['arah'], [
+            'desa' => 'DESA', 'tps' => 'CAST(TPS AS UNSIGNED)', 'nama' => 'NAMA',
+            'tgllhr' => 'TGLLHR', 'umur' => 'UMUR', 'ket' => 'KET',
+        ], ['DESA', 'CAST(TPS AS UNSIGNED)', 'NAMA']);
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], (int) $p['perhal']);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NKK', 'NIK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => (int) $p['perhal'],
+            'saring' => ['desa' => $p['desa'], 'tps' => $p['tps'], 'lp' => $p['lp'], 'cari' => $p['cari'], 'urut' => $p['urut'], 'arah' => $p['arah']],
+            'urut' => $p['urut'], 'arah' => $p['arah'],
+            'urlTabel' => base_url('pemilih/tabelAktif'), 'target' => '#wadah-tabel-aktif',
+        ];
+    }
+
+    /** @param array<string, mixed> $param */
+    private function dataBaru(array $param): array
+    {
+        $p = array_merge(['desa' => '', 'tps' => '', 'lp' => '', 'dp4' => '', 'cari' => '', 'urut' => '', 'arah' => 'asc', 'hal' => 1, 'perhal' => 10], $param);
+        $builder = db_connect()->table('pemilihbaru2')
+            ->select('DESA, TPS, NIK, NAMA, TGLLHR, JENIS_KELAMIN, OLD_NAMA');
+        $this->saringWilayah($builder);
+        if ($p['desa'] !== '') {
+            $builder->where('DESA', $p['desa']);
+        }
+        if ($p['tps'] !== '') {
+            $builder->where('TPS', $p['tps']);
+        }
+        if ($p['lp'] !== '') {
+            $builder->where('JENIS_KELAMIN', $p['lp']);
+        }
+        if ($p['dp4'] !== '') {
+            $builder->where($p['dp4'] > 0 ? 'OLD_NAMA IS NOT NULL' : 'OLD_NAMA IS NULL', null);
+        }
+        $this->terapkanCari($builder, $p['cari'], ['NAMA', 'NIK']);
+        $this->terapkanUrut($builder, $p['urut'], $p['arah'], [
+            'desa' => 'DESA', 'tps' => 'CAST(TPS AS UNSIGNED)', 'nama' => 'NAMA', 'tgllhr' => 'TGLLHR',
+        ], ['DESA', 'CAST(TPS AS UNSIGNED)', 'NAMA']);
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], (int) $p['perhal']);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NIK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => (int) $p['perhal'],
+            'saring' => ['desa' => $p['desa'], 'tps' => $p['tps'], 'lp' => $p['lp'], 'dp4' => $p['dp4'], 'cari' => $p['cari'], 'urut' => $p['urut'], 'arah' => $p['arah']],
+            'urut' => $p['urut'], 'arah' => $p['arah'],
+            'urlTabel' => base_url('pemilih/tabelBaru'), 'target' => '#wadah-tabel-baru',
+        ];
+    }
+
+    /** @param array<string, mixed> $param */
+    private function dataTersaring(array $param): array
+    {
+        $p = array_merge(['desa' => '', 'tps' => '', 'lp' => '', 'ket' => '', 'cari' => '', 'urut' => '', 'arah' => 'asc', 'hal' => 1, 'perhal' => 10], $param);
+        $builder = db_connect()->table('tersaring')
+            ->select('DESA, TPS, NIK, NAMA, TGLLHR, LP, KET');
+        $this->saringWilayah($builder);
+        if ($p['desa'] !== '') {
+            $builder->where('DESA', $p['desa']);
+        }
+        if ($p['tps'] !== '') {
+            $builder->where('TPS', $p['tps']);
+        }
+        if ($p['lp'] !== '') {
+            $builder->where('LP', $p['lp']);
+        }
+        if ($p['ket'] !== '') {
+            $builder->where('KET', $p['ket']);
+        }
+        $this->terapkanCari($builder, $p['cari'], ['NAMA', 'NIK']);
+        $this->terapkanUrut($builder, $p['urut'], $p['arah'], [
+            'desa' => 'DESA', 'tps' => 'CAST(TPS AS UNSIGNED)', 'nama' => 'NAMA', 'tgllhr' => 'TGLLHR', 'ket' => 'KET',
+        ], ['DESA', 'CAST(TPS AS UNSIGNED)', 'NAMA']);
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], (int) $p['perhal']);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NIK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => (int) $p['perhal'],
+            'saring' => ['desa' => $p['desa'], 'tps' => $p['tps'], 'lp' => $p['lp'], 'ket' => $p['ket'], 'cari' => $p['cari'], 'urut' => $p['urut'], 'arah' => $p['arah']],
+            'urut' => $p['urut'], 'arah' => $p['arah'],
+            'urlTabel' => base_url('pemilih/tabelTersaring'), 'target' => '#wadah-tabel-tersaring',
+        ];
+    }
+
+    /** @param array<string, mixed> $param */
+    private function dataPindah(array $param): array
+    {
+        $p = array_merge(['desa' => '', 'tps' => '', 'lp' => '', 'stat' => '', 'cari' => '', 'urut' => '', 'arah' => 'asc', 'hal' => 1, 'perhal' => 10], $param);
+        $builder = db_connect()->table('pindahtps')
+            ->select('ID, NKK, NIK, NAMA, DESA, TPS, KET, MSDESA, MSTPS, MSNAMA, MSLP, STATUS');
+        $this->saringWilayah($builder);
+        if ($p['desa'] !== '') {
+            $builder->where('DESA', $p['desa']);
+        }
+        if ($p['tps'] !== '') {
+            $builder->where('TPS', $p['tps']);
+        }
+        if ($p['lp'] !== '') {
+            $builder->where('MSLP', $p['lp']);
+        }
+        if ($p['stat'] !== '') {
+            if ($p['stat'] == 1) {
+                $builder->where('MSTPS >', '1');
+            } else {
+                $builder->where('MSTPS IS NULL', null);
+            }
+        }
+        $this->terapkanCari($builder, $p['cari'], ['NAMA', 'NIK', 'NKK']);
+        $this->terapkanUrut($builder, $p['urut'], $p['arah'], [
+            'desa' => 'DESA', 'tps' => 'CAST(TPS AS UNSIGNED)', 'nama' => 'NAMA', 'ket' => 'KET',
+        ], ['DESA', 'CAST(TPS AS UNSIGNED)', 'NAMA']);
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], (int) $p['perhal']);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NKK', 'NIK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => (int) $p['perhal'],
+            'saring' => ['desa' => $p['desa'], 'tps' => $p['tps'], 'lp' => $p['lp'], 'stat' => $p['stat'], 'cari' => $p['cari'], 'urut' => $p['urut'], 'arah' => $p['arah']],
+            'urut' => $p['urut'], 'arah' => $p['arah'],
+            'urlTabel' => base_url('pemilih/tabelPindah'), 'target' => '#wadah-tabel-pindah',
+        ];
+    }
+
+    public function tabelAktif()
+    {
+        return view('pemilih/_tabel_aktif', $this->dataAktif($this->paramTabel()));
+    }
+
+    public function tabelBaru()
+    {
+        return view('pemilih/_tabel_baru', $this->dataBaru($this->paramTabel(['dp4'])));
+    }
+
+    public function tabelTersaring()
+    {
+        return view('pemilih/_tabel_tersaring', $this->dataTersaring($this->paramTabel(['ket'])));
+    }
+
+    public function tabelPindah()
+    {
+        return view('pemilih/_tabel_pindah', $this->dataPindah($this->paramTabel(['stat'])));
     }
 
     // -- Cetak daftar MS -------------------------------------------------

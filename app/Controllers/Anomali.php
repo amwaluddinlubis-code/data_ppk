@@ -48,6 +48,9 @@ class Anomali extends BaseController
         $data['statNik']      = $this->statistikNik();
         $data['statKecamatan'] = $this->statistikPerKecamatan();
         $data['adalahAdmin']  = session()->get('pengguna_peran') === 'admin';
+        $data['tabelTerselubungAwal'] = $this->dataTerselubung([]);
+        $data['tabelKkAwal']          = $this->dataKk([]);
+        $data['tabelUmurAwal']        = $this->dataUmur([]);
         return view('anomali', $data);
     }
 
@@ -347,6 +350,178 @@ class Anomali extends BaseController
         // Kolom: 0 No, 1 NIK, 2 NKK, 3 Nama, 4 Tgl Lahir, 5 L/P,
         // 6 Kecamatan, 7 Desa, 8 TPS, 9 Keterangan, 10 Umur, 11 Kategori.
         return $this->samarkanUntukPemeriksa($json, [1, 2]);
+    }
+
+    // -- Tabel HTMX (konversi dari DataTables, 10 Nov 2026) -------------
+
+    /** @param array<string, mixed> $param */
+    private function dataTerselubung(array $param): array
+    {
+        $p = array_merge(['cari' => '', 'hal' => 1, 'perhal' => 10], $param);
+        $perHal = in_array((int) $p['perhal'], [10, 25, 50, 100], true) ? (int) $p['perhal'] : 10;
+        $db   = db_connect();
+        $niks = $this->nikTerselubung($this->pasanganTerselubung());
+
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.TGL_LAHIR, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET, mhc.SUMBER', false)
+            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
+            ->orderBy('mhc.NAMA', 'ASC')
+            ->orderBy('mhc.TGL_LAHIR', 'ASC')
+            ->orderBy('mhc.NIK', 'ASC');
+        if ($niks === []) {
+            $builder->where('1 = 0', null, false);
+        } else {
+            $builder->whereIn('mhc.NIK', $niks);
+        }
+        if ($p['cari'] !== '') {
+            $builder->groupStart()->like('mhc.NAMA', $p['cari'])
+                ->orLike('mhc.NIK', $p['cari'])->orLike('mhc.NKK', $p['cari'])->groupEnd();
+        }
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], $perHal);
+        $label = \App\Libraries\Keterangan::daftar();
+        foreach ($rows as &$r) {
+            $r['TGL_TAMPIL'] = $r['TGL_LAHIR'] ? date('d-m-Y', strtotime((string) $r['TGL_LAHIR'])) : '';
+            $r['KET_LABEL']  = $label[(string) $r['KET']] ?? (string) $r['KET'];
+        }
+        unset($r);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NIK', 'NKK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => $perHal,
+            'saring' => ['cari' => $p['cari']],
+            'urlTabel' => base_url('anomali/tabelTerselubung'), 'target' => '#wadah-terselubung',
+        ];
+    }
+
+    /** @param array<string, mixed> $param */
+    private function dataKk(array $param): array
+    {
+        $p = array_merge(['kategori' => '', 'cari' => '', 'hal' => 1, 'perhal' => 10], $param);
+        $perHal = in_array((int) $p['perhal'], [10, 25, 50, 100], true) ? (int) $p['perhal'] : 10;
+        $db   = db_connect();
+        $peta = $this->petaKkTersebar();
+
+        $nkks = [];
+        foreach ($peta as $nkk => $kat) {
+            if ($p['kategori'] === '' || $kat === $p['kategori']) {
+                $nkks[] = $nkk;
+            }
+        }
+
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NKK, mhc.NIK, mhc.NAMA, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
+            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
+            ->orderBy('mhc.NKK', 'ASC')
+            ->orderBy('KEC', 'ASC')
+            ->orderBy('DESA', 'ASC')
+            ->orderBy('mhc.TPS', 'ASC')
+            ->orderBy('mhc.NAMA', 'ASC');
+        if ($nkks === []) {
+            $builder->where('1 = 0', null, false);
+        } else {
+            $builder->whereIn('mhc.NKK', $nkks);
+        }
+        if ($p['cari'] !== '') {
+            $builder->groupStart()->like('mhc.NAMA', $p['cari'])
+                ->orLike('mhc.NIK', $p['cari'])->orLike('mhc.NKK', $p['cari'])->groupEnd();
+        }
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], $perHal);
+        $label = \App\Libraries\Keterangan::daftar();
+        foreach ($rows as &$r) {
+            $r['KET_LABEL'] = $label[(string) $r['KET']] ?? (string) $r['KET'];
+            $r['KATEGORI']  = ($peta[$r['NKK']] ?? 'tps') === 'desa' ? 'Antar Desa' : 'Beda TPS';
+        }
+        unset($r);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NKK', 'NIK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => $perHal,
+            'saring' => ['kategori' => $p['kategori'], 'cari' => $p['cari']],
+            'urlTabel' => base_url('anomali/tabelKk'), 'target' => '#wadah-kk',
+        ];
+    }
+
+    /** @param array<string, mixed> $param */
+    private function dataUmur(array $param): array
+    {
+        $p = array_merge(['kategori' => '', 'cari' => '', 'hal' => 1, 'perhal' => 10], $param);
+        $perHal = in_array((int) $p['perhal'], [10, 25, 50, 100], true) ? (int) $p['perhal'] : 10;
+        $db       = db_connect();
+        $acuan    = $this->tanggalAcuan();
+        [$batas100, $batas17] = $this->batasUmur($acuan);
+
+        $kondisi = match ($p['kategori']) {
+            'atas'  => "mhc.TGL_LAHIR < '{$batas100}'",
+            'bawah' => "(mhc.TGL_LAHIR > '{$batas17}' AND mhc.STATUS = 'B')",
+            default => "(mhc.TGL_LAHIR < '{$batas100}' OR (mhc.TGL_LAHIR > '{$batas17}' AND mhc.STATUS = 'B'))",
+        };
+
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.TGL_LAHIR, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET', false)
+            ->whereIn('mhc.KET', \App\Libraries\Keterangan::MS)
+            ->where($kondisi, null, false)
+            ->orderBy('mhc.TGL_LAHIR', 'ASC')
+            ->orderBy('mhc.NAMA', 'ASC');
+        \App\Libraries\Wilayah::saringId($builder);
+        if ($p['cari'] !== '') {
+            $builder->groupStart()->like('mhc.NAMA', $p['cari'])
+                ->orLike('mhc.NIK', $p['cari'])->orLike('mhc.NKK', $p['cari'])->groupEnd();
+        }
+
+        [$rows, $total, $halaman, $totalHal] = $this->halamanTabel($builder, (int) $p['hal'], $perHal);
+        $label = \App\Libraries\Keterangan::daftar();
+        foreach ($rows as &$r) {
+            $r['TGL_TAMPIL'] = $r['TGL_LAHIR'] ? date('d-m-Y', strtotime((string) $r['TGL_LAHIR'])) : '';
+            $r['KET_LABEL']  = $label[(string) $r['KET']] ?? (string) $r['KET'];
+            $r['UMUR']       = (new \DateTimeImmutable((string) $r['TGL_LAHIR']))
+                ->diff(new \DateTimeImmutable($acuan))->y . ' tahun';
+            $r['KATEGORI']   = (string) $r['TGL_LAHIR'] < $batas100 ? 'Di Atas 100 Tahun' : 'Di Bawah 17 Tahun';
+        }
+        unset($r);
+
+        return [
+            'rows' => $this->samarkanBarisPemeriksa($rows, ['NIK', 'NKK']),
+            'total' => $total, 'halaman' => $halaman, 'totalHal' => $totalHal, 'perHal' => $perHal,
+            'saring' => ['kategori' => $p['kategori'], 'cari' => $p['cari']],
+            'urlTabel' => base_url('anomali/tabelUmur'), 'target' => '#wadah-umur',
+        ];
+    }
+
+    public function tabelTerselubung()
+    {
+        return view('anomali/_tabel_terselubung', $this->dataTerselubung([
+            'cari'   => trim((string) ($this->request->getGet('cari') ?? $this->request->getGet('cari_terselubung'))),
+            'hal'    => (int) $this->request->getGet('hal'),
+            'perhal' => (int) $this->request->getGet('perhal'),
+        ]));
+    }
+
+    public function tabelKk()
+    {
+        return view('anomali/_tabel_kk', $this->dataKk([
+            'kategori' => trim((string) $this->request->getGet('kategori')),
+            'cari'     => trim((string) ($this->request->getGet('cari') ?? $this->request->getGet('cari_kk'))),
+            'hal'      => (int) $this->request->getGet('hal'),
+            'perhal'   => (int) $this->request->getGet('perhal'),
+        ]));
+    }
+
+    public function tabelUmur()
+    {
+        return view('anomali/_tabel_umur', $this->dataUmur([
+            'kategori' => trim((string) $this->request->getGet('kategori')),
+            'cari'     => trim((string) ($this->request->getGet('cari') ?? $this->request->getGet('cari_umur'))),
+            'hal'      => (int) $this->request->getGet('hal'),
+            'perhal'   => (int) $this->request->getGet('perhal'),
+        ]));
     }
 
     /** Ekspresi SQL tanggal lahir (hari) yang terkode pada NIK, apa adanya. */
