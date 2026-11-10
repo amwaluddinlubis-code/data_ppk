@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 /**
- * Fase 5 — Cadangan basis data (hanya Admin PPK).
+ * Cadangan basis data (hanya Admin Kabupaten).
  *
  * Membuat dump SQL lengkap (struktur + data semua tabel, lalu view)
  * dari basis data kecamatan yang SEDANG AKTIF, menyimpannya di

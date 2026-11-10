@@ -6,7 +6,7 @@ use App\Models\RiwayatModel;
 use CodeIgniter\Database\BaseConnection;
 
 /**
- * Fase 2 — CRUD data coklit (tabel `mhc`).
+ * CRUD data coklit (tabel `mhc`).
  *
  * Hanya Admin PPK & Operator. Operator yang punya cakupan desa
  * (kolom users.desa terisi, mis. PPS) hanya melihat & mengubah
@@ -20,8 +20,6 @@ use CodeIgniter\Database\BaseConnection;
  */
 class Coklit extends BaseController
 {
-    /** Kode KET yang berarti pemilih berada di daftar MS/aktif. */
-    private const KET_MS = ['0', 'U', 'B'];
 
     private function db(): BaseConnection
     {
@@ -40,9 +38,7 @@ class Coklit extends BaseController
     /** Desa cakupan pengguna (null = seluruh kecamatan). */
     private function desaCakupan(): ?string
     {
-        $desa = session()->get('pengguna_desa');
-
-        return ($desa === null || $desa === '') ? null : (string) $desa;
+        return \App\Libraries\Wilayah::desaPengguna();
     }
 
     private function dataHalaman(string $judul): array
@@ -55,10 +51,10 @@ class Coklit extends BaseController
         ];
     }
 
-    /** Ambil satu baris mhc; hormati cakupan desa pengguna. */
-    private function ambilBaris(string $uid): ?array
+    /** Ambil satu baris mhc berdasar kunci pokok ID; hormati cakupan wilayah. */
+    private function ambilBaris(string $id): ?array
     {
-        $row = $this->db()->table('mhc')->where('UID', $uid)->get()->getRowArray();
+        $row = $this->db()->table('mhc')->where('ID', (int) $id)->get()->getRowArray();
         if ($row === null) {
             return null;
         }
@@ -76,19 +72,10 @@ class Coklit extends BaseController
 
     public static function labelKet(): array
     {
-        return [
-            '0' => '0 — Pemilih Sesuai',
-            'U' => 'U — Pemilih Ubah',
-            'B' => 'B — Pemilih Baru',
-            '1' => '1 — Meninggal',
-            '2' => '2 — Ganda',
-            '3' => '3 — Di Bawah Umur',
-            '4' => '4 — Pindah Domisili',
-            '5' => '5 — WNA',
-            '6' => '6 — TNI',
-            '7' => '7 — Polri',
-            '8' => '8 — Salah Penempatan TPS',
-        ];
+        // Bangun ulang 2026: definisi kode keterangan kini terpusat di
+        // App\Libraries\Keterangan — metode ini dipertahankan agar
+        // pemanggil lama tetap bekerja.
+        return \App\Libraries\Keterangan::daftar();
     }
 
     // -- Daftar ------------------------------------------------------
@@ -130,7 +117,7 @@ class Coklit extends BaseController
         $data['halaman']   = $halaman;
         $data['perHal']    = $perHal;
         $data['totalHal']  = max(1, (int) ceil($total / $perHal));
-        $data['labelKet']  = self::labelKet();
+        $data['labelKet']  = \App\Libraries\Keterangan::daftar();
 
         return view('coklit/index', $data);
     }
@@ -149,7 +136,7 @@ class Coklit extends BaseController
         $data['baris']      = null;
         $data['daftarDesa'] = $this->daftarDesa();
         $data['cakupan']    = $this->desaCakupan();
-        $data['labelKet']   = self::labelKet();
+        $data['labelKet']   = \App\Libraries\Keterangan::daftar();
 
         return view('coklit/form', $data);
     }
@@ -169,7 +156,7 @@ class Coklit extends BaseController
         $db  = $this->db();
         $uid = strtoupper(bin2hex(random_bytes(8)));
         $bersih['UID'] = $uid;
-        $bersih['ID']  = (int) ($db->table('mhc')->selectMax('ID')->get()->getRowArray()['ID'] ?? 0) + 1;
+        // ID tidak diisi manual: kolomnya kini AUTO_INCREMENT.
         $bersih['LAST_UPDATE'] = date('Y-m-d H:i:s');
 
         $db->transStart();
@@ -204,7 +191,7 @@ class Coklit extends BaseController
         $data['baris']      = $baris;
         $data['daftarDesa'] = $this->daftarDesa();
         $data['cakupan']    = $this->desaCakupan();
-        $data['labelKet']   = self::labelKet();
+        $data['labelKet']   = \App\Libraries\Keterangan::daftar();
 
         return view('coklit/form', $data);
     }
@@ -230,8 +217,8 @@ class Coklit extends BaseController
 
         $db = $this->db();
         $db->transStart();
-        $db->table('mhc')->where('UID', (string) $uid)->update($bersih);
-        $baru = $db->table('mhc')->where('UID', (string) $uid)->get()->getRowArray();
+        $db->table('mhc')->where('ID', (int) $uid)->update($bersih);
+        $baru = $db->table('mhc')->where('ID', (int) $uid)->get()->getRowArray();
         (new RiwayatModel())->catat('ubah', $lama, $baru);
         $db->transComplete();
 
@@ -258,7 +245,7 @@ class Coklit extends BaseController
         $db = $this->db();
         $db->transStart();
         (new RiwayatModel())->catat('hapus', $lama, null);
-        $db->table('mhc')->where('UID', (string) $uid)->delete();
+        $db->table('mhc')->where('ID', (int) $uid)->delete();
         $db->transComplete();
 
         if (! $db->transStatus()) {
@@ -313,7 +300,7 @@ class Coklit extends BaseController
         }
 
         $ket = $ambil('KET');
-        if (! array_key_exists($ket, self::labelKet())) {
+        if (! array_key_exists($ket, \App\Libraries\Keterangan::daftar())) {
             $galat[] = 'Kode KET tidak dikenal.';
         }
 
@@ -324,11 +311,11 @@ class Coklit extends BaseController
 
         // Cegah NIK ganda di daftar aktif: NIK yang sama tidak boleh
         // muncul dua kali pada kelompok MS (0/U/B).
-        if ($galat === [] && in_array($ket, self::KET_MS, true)) {
+        if ($galat === [] && in_array($ket, \App\Libraries\Keterangan::MS, true)) {
             $builder = $this->db()->table('mhc')
-                ->where('NIK', $nik)->whereIn('KET', self::KET_MS);
+                ->where('NIK', $nik)->whereIn('KET', \App\Libraries\Keterangan::MS);
             if ($uidSelf !== null) {
-                $builder->where('UID !=', $uidSelf);
+                $builder->where('ID !=', (int) $uidSelf);
             }
             if ($builder->countAllResults() > 0) {
                 $galat[] = 'NIK ' . $nik . ' sudah ada di daftar aktif (MS). Periksa halaman NIK Ganda / data yang bersangkutan.';

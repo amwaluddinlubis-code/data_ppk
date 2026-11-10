@@ -295,3 +295,39 @@ php spark impor:massal berkas-tanpa-kolom-kec.csv --kecamatan "RANTO BAEK"
 - **Mode ganti**: data lama kecamatan yang muncul di berkas
   dicadangkan dulu ke `writable/backup/` lalu diganti isi berkas.
 - Pencatatan masuk `impor_log` dengan pengguna `konsol`.
+
+---
+
+## Versi Bangun Ulang (10 November 2026)
+
+Kode aplikasi ditulis ulang di atas fondasi yang sama (CodeIgniter 4.7,
+skema data kompatibel) untuk menghilangkan kelemahan warisan kode
+manual:
+
+- **Satu sumber definisi** — kode keterangan pemilih di
+  `app/Libraries/Keterangan.php`; logika cakupan wilayah di
+  `app/Libraries/Wilayah.php`; aturan impor (pemetaan kolom dua format,
+  kunci baris) di `app/Libraries/ImporCoklit.php`. Tidak ada lagi
+  daftar kode/logika yang disalin ke banyak berkas.
+- **NIK adalah identitas unik pemilih** — kolom ter-generate
+  `NIK_AKTIF` + indeks unik `uq_mhc_nik_aktif` menjamin satu NIK hanya
+  mempunyai satu baris aktif (MS) di seluruh kabupaten; baris
+  tersaring orang yang sama tetap boleh ada. Impor (web & konsol)
+  menerima baris aktif pertama per NIK dan MENGALIHKAN baris aktif
+  berikutnya sambil menghitung & melaporkannya. Bila data lama masih
+  mengandung NIK aktif ganda, migrasi melewati pemasangan indeks unik
+  dengan pesan penjelasan (penegakan tetap berjalan di aplikasi).
+- **`mhc.ID` kini PRIMARY KEY AUTO_INCREMENT** — pengenal baris yang
+  sesungguhnya; halaman Coklit mengalamatkan baris dengan ID ini.
+- **Definisi view terpusat** — migration `ViewTerpusat` menetapkan
+  bentuk akhir semua view aplikasi dalam satu tempat.
+- **Impor Sidalih asli** — perintah `php spark impor:massal` mengenali
+  ekspor Sidalih (KECAMATAN/KELURAHAN/DPID/KETERANGAN) dan membacanya
+  secara mengalir (`app/Libraries/PembacaXlsx.php`), teruji pada
+  338.955 baris data Kabupaten Mandailing Natal: 338.108 pemilih unik
+  masuk, 847 baris teralih sebagai ganda NIK aktif, 4 baris ditolak
+  (1 NIK tidak sah, 3 baris anomali sumber).
+
+Pemasangan di komputer baru sama seperti sebelumnya: salin `.env`,
+jalankan `php spark migrate`, buat admin awal lewat
+`php spark db:seed PenggunaAwalSeeder`.

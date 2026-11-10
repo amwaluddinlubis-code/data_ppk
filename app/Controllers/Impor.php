@@ -120,16 +120,31 @@ class Impor extends BaseController
             }
         }
 
-        $uidAda = [];
+        // Mode tambah: saring duplikat dengan kunci gabungan
+        // UID+KET+DESA+TPS (App\Libraries\ImporCoklit), BUKAN UID
+        // saja — satu UID dipakai bersama baris tersaring + baris baru
+        // orang yang sama, jadi saringan UID saja membuang baris sah.
+        $kunciAda = [];
         if ($mode === 'tambah') {
-            foreach ($db->table('mhc')->select('UID')->get()->getResultArray() as $r) {
-                $uidAda[(string) $r['UID']] = true;
+            foreach ($db->table('mhc')->select('UID, KET, DESA, TPS')->get()->getResultArray() as $r) {
+                $kunciAda[\App\Libraries\ImporCoklit::kunciBaris($r['UID'], $r['KET'], $r['DESA'], $r['TPS'])] = true;
             }
+        }
+
+        // Penanda NIK yang sudah mempunyai baris aktif (satu NIK satu
+        // baris aktif). Mode ganti: baris aktif kecamatan tujuan sendiri
+        // tidak menghalangi karena akan diganti.
+        $nikAktifAda = [];
+        $qAktif = $db->table('mhc')->select('NIK')->whereIn('KET', \App\Libraries\Keterangan::MS);
+        if ($mode === 'ganti') {
+            $qAktif->where('KEC !=', $target);
+        }
+        foreach ($qAktif->get()->getResultArray() as $r) {
+            $nikAktifAda[(string) $r['NIK']] = true;
         }
 
         $siap = [];
         $gagal = [];
-        $idBerikut = (int) ($db->table('mhc')->selectMax('ID')->get()->getRowArray()['ID'] ?? 0);
         $jumlahBarisData = count($baris) - 1;
 
         for ($i = 1; $i < count($baris); $i++) {
@@ -153,10 +168,6 @@ class Impor extends BaseController
             }
 
             $uid = $ambil('UID');
-            if ($mode === 'tambah' && $uid !== null && isset($uidAda[$uid])) {
-                $gagal[] = 'Baris ' . ($i + 1) . ': UID ' . $uid . ' sudah ada — dilewati.';
-                continue;
-            }
             if ($uid === null) {
                 $uid = strtoupper(bin2hex(random_bytes(8)));
             }
@@ -166,11 +177,8 @@ class Impor extends BaseController
                 $row[$kolom] = $ambil($kolom);
             }
             $row['UID'] = $uid;
-            $idFile = $ambil('ID');
-            $row['ID'] = ($mode === 'tambah' || $idFile === null) ? ++$idBerikut : (int) $idFile;
-            if ($mode === 'ganti' && $idFile !== null) {
-                $idBerikut = max($idBerikut, (int) $idFile);
-            }
+            // ID tidak diisi dari berkas: kini AUTO_INCREMENT.
+            unset($row['ID']);
             $row['TGL_COKLIT'] = $this->normalisasiTanggal($row['TGL_COKLIT']);
 
             $kecBerkas = $row['KEC'] !== null ? strtoupper(trim((string) $row['KEC'])) : '';
@@ -179,6 +187,22 @@ class Impor extends BaseController
                 continue;
             }
             $row['KEC'] = $target;
+
+            if (\App\Libraries\Keterangan::isMs((string) $row['KET'])) {
+                if (isset($nikAktifAda[$nik])) {
+                    $gagal[] = 'Baris ' . ($i + 1) . ': NIK ' . $nik . ' sudah mempunyai baris aktif — dialihkan (satu NIK satu baris aktif).';
+                    continue;
+                }
+                $nikAktifAda[$nik] = true;
+            }
+            if ($mode === 'tambah') {
+                $kunci = \App\Libraries\ImporCoklit::kunciBaris($row['UID'], $row['KET'], $row['DESA'], $row['TPS']);
+                if (isset($kunciAda[$kunci])) {
+                    $gagal[] = 'Baris ' . ($i + 1) . ': baris yang sama (UID+KET+Desa+TPS) sudah ada — dilewati.';
+                    continue;
+                }
+                $kunciAda[$kunci] = true;
+            }
 
             $siap[] = $row;
         }

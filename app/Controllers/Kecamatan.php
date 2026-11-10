@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 /**
- * Fase 7 — Pilih kecamatan aktif (saringan wilayah).
+ * Pilih kecamatan aktif (saringan wilayah).
  *
  * Satu basis data berisi seluruh kabupaten; halaman ini mengganti
  * kecamatan yang sedang ditampilkan untuk pengguna tingkat kabupaten

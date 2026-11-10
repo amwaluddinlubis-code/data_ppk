@@ -7,7 +7,7 @@ $nilai = static function (string $k) use ($lamaInput, $baris) {
     return $lamaInput[$k] ?? ($baris[$k] ?? '');
 };
 $isEdit = $baris !== null;
-$aksiForm = $isEdit ? base_url('coklit/update/' . $baris['UID']) : base_url('coklit/simpan');
+$aksiForm = $isEdit ? base_url('coklit/update/' . $baris['ID']) : base_url('coklit/simpan');
 ?>
 <?php if (session()->getFlashdata('galat')) : ?>
     <div class="alert alert-error shadow-sm mb-4 text-sm"><?= esc(session()->getFlashdata('galat')) ?></div>

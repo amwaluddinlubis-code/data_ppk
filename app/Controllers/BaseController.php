@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Libraries\Wilayah;
 use CodeIgniter\Controller;
 use CodeIgniter\HTTP\CLIRequest;
 use CodeIgniter\HTTP\IncomingRequest;
@@ -10,14 +11,13 @@ use CodeIgniter\HTTP\ResponseInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Class BaseController
+ * Kelas dasar semua controller.
  *
- * BaseController provides a convenient place for loading components
- * and performing functions that are needed by all your controllers.
- * Extend this class in any new controllers:
- *     class Home extends BaseController
- *
- * For security be sure to declare any new methods as protected or private.
+ * Bangun ulang 2026: logika cakupan wilayah dipindah ke
+ * App\Libraries\Wilayah (satu tempat, dipakai juga di luar controller)
+ * dan definisi kode keterangan ke App\Libraries\Keterangan. Kelas ini
+ * hanya menyimpan keadaan sesi bersama, daftar wilayah, pencatatan
+ * akses, dan penyamaran data untuk Pemeriksa.
  */
 abstract class BaseController extends Controller
 {
@@ -28,26 +28,14 @@ abstract class BaseController extends Controller
      */
     protected $request;
 
-    /**
-     * An array of helpers to be loaded automatically upon
-     * class instantiation. These helpers will be available
-     * to all other controllers that extend BaseController.
-     *
-     * @var array
-     */
+    /** @var array */
     protected $helpers = [];
 
     /**
-     * Be sure to declare properties for any property fetch you initialized.
-     * The creation of dynamic property is deprecated in PHP 8.2.
-     */
-    // protected $session;
-
-    /**
      * Nama kecamatan yang sedang AKTIF sebagai saringan wilayah pada
-     * sesi ini (Fase 7), diisi di initController. Null berarti tampilan
-     * seluruh kabupaten (hanya untuk pengguna tanpa cakupan kecamatan,
-     * yaitu Admin Kabupaten).
+     * sesi ini, diisi di initController. Null berarti tampilan seluruh
+     * kabupaten (hanya untuk pengguna tanpa cakupan kecamatan, yaitu
+     * Admin Kabupaten).
      */
     protected $kec;
 
@@ -60,28 +48,21 @@ abstract class BaseController extends Controller
     /** Pengguna yang sedang masuk (dari sesi), atau null bila belum masuk. */
     protected $pengguna;
 
-    /**
-     * Constructor.
-     */
     public function initController(RequestInterface $request, ResponseInterface $response, LoggerInterface $logger)
     {
         // Do Not Edit This Line
         parent::initController($request, $response, $logger);
 
-        // Fase 7: satu basis data kabupaten. Kecamatan adalah saringan
-        // wilayah: pengguna PPK/PPS terkunci ke cakupannya (kolom
-        // users.kecamatan/desa); Admin Kabupaten bebas memilih saringan
-        // lewat sesi `kec_filter` (null = seluruh kabupaten).
         try {
-            $db       = db_connect();
-            $qKab     = $db->table('mhc')->select('KAB')->where('KAB IS NOT NULL')->where('KAB !=', '')->limit(1)->get()->getRow();
+            $qKab = db_connect()->table('mhc')->select('KAB')
+                ->where('KAB IS NOT NULL')->where('KAB !=', '')->limit(1)->get()->getRow();
             $this->kab = $qKab->KAB ?? null;
         } catch (\Throwable) {
             $this->kab = null;
         }
-        $this->kec = $this->kecEfektif();
+        $this->kec = Wilayah::kecEfektif();
 
-        $session = session();
+        $session        = session();
         $this->pengguna = $session->get('pengguna_id') ? [
             'id'        => $session->get('pengguna_id'),
             'nama'      => $session->get('pengguna_nama'),
@@ -90,68 +71,36 @@ abstract class BaseController extends Controller
             'kecamatan' => $session->get('pengguna_kecamatan'),
             'desa'      => $session->get('pengguna_desa'),
         ] : null;
-        // Preload any models, libraries, etc, here.
-
-        // E.g.: $this->session = \Config\Services::session();
     }
 
-    /** Kecamatan cakupan akun yang masuk (PPK/PPS); null = kabupaten. */
+    // -- Cakupan wilayah (delegasi ke App\Libraries\Wilayah) ---------
+
     protected function kecPengguna(): ?string
     {
-        $kec = session()->get('pengguna_kecamatan');
-
-        return ($kec === null || $kec === '') ? null : (string) $kec;
+        return Wilayah::kecPengguna();
     }
 
-    /** Desa cakupan akun yang masuk (PPS); null = seluruh kecamatan. */
     protected function desaPengguna(): ?string
     {
-        $desa = session()->get('pengguna_desa');
-
-        return ($desa === null || $desa === '') ? null : (string) $desa;
+        return Wilayah::desaPengguna();
     }
 
-    /**
-     * Kecamatan yang berlaku efektif untuk semua kueri halaman ini:
-     * cakupan akun bila ada; selain itu saringan sesi (admin); null
-     * berarti seluruh kabupaten.
-     */
     protected function kecEfektif(): ?string
     {
-        $kecUser = $this->kecPengguna();
-        if ($kecUser !== null) {
-            return $kecUser;
-        }
-        $filter = session()->get('kec_filter');
-
-        return ($filter === null || $filter === '') ? null : (string) $filter;
+        return Wilayah::kecEfektif();
     }
 
-    /** Terapkan saringan kecamatan efektif ke builder (bila ada). */
     protected function saringKec($builder, string $kolom = 'KEC')
     {
-        $kec = $this->kecEfektif();
-        if ($kec !== null) {
-            $builder->where($kolom, $kec);
-        }
-
-        return $builder;
+        return Wilayah::saringKec($builder, $kolom);
     }
 
-    /**
-     * Terapkan saringan wilayah penuh: kecamatan efektif + desa
-     * cakupan akun (PPS hanya boleh melihat desanya sendiri).
-     */
     protected function saringWilayah($builder, string $kolomKec = 'KEC', string $kolomDesa = 'DESA')
     {
-        $this->saringKec($builder, $kolomKec);
-        $desa = $this->desaPengguna();
-        if ($desa !== null) {
-            $builder->where($kolomDesa, $desa);
-        }
-
-        return $builder;
+        return Wilayah::saring($builder, $kolomKec, $kolomDesa);
     }
+
+    // -- Daftar wilayah ----------------------------------------------
 
     /** @return list<string> Daftar kecamatan yang ada di data coklit. */
     protected function daftarKecamatan(): array
@@ -176,11 +125,11 @@ abstract class BaseController extends Controller
      */
     protected function daftarDesa(?string $kec = null): array
     {
-        $desaUser = $this->desaPengguna();
+        $desaUser = Wilayah::desaPengguna();
         if ($desaUser !== null) {
             return [$desaUser];
         }
-        $kec = $kec ?? $this->kecEfektif();
+        $kec = $kec ?? Wilayah::kecEfektif();
         try {
             $builder = db_connect()->table('mhc')->select('DESA')->distinct()
                 ->where('DESA IS NOT NULL')->where('DESA !=', '');
@@ -195,9 +144,10 @@ abstract class BaseController extends Controller
         }
     }
 
+    // -- Pencatatan akses ---------------------------------------------
+
     /**
-     * Fase 5 — Catat akses data sensitif ke `akses_log` di basis data
-     * UTAMA (grup 'default'), apa pun kecamatan yang sedang aktif.
+     * Catat akses data sensitif ke `akses_log` di basis data utama.
      * Kegagalan mencatat tidak boleh menggagalkan pekerjaan utama.
      */
     protected function catatAkses(string $aksi, ?string $detail = null, ?string $username = null, ?int $userId = null): void
@@ -216,6 +166,8 @@ abstract class BaseController extends Controller
         }
     }
 
+    // -- Penyamaran untuk Pemeriksa (UU PDP) ---------------------------
+
     /** Samarkan satu nilai NIK/NKK: 4 angka awal + 4 angka akhir. */
     protected function samarkanNomor($nilai): string
     {
@@ -228,9 +180,9 @@ abstract class BaseController extends Controller
     }
 
     /**
-     * Fase 5 — Untuk peran Pemeriksa (viewer), NIK & NKK pada jawaban
-     * DataTables disamarkan (UU PDP: tampilkan seperlunya saja).
-     * $kolom berisi indeks kolom pada baris data (0 = nomor urut).
+     * Untuk peran Pemeriksa (viewer), NIK & NKK pada jawaban DataTables
+     * disamarkan. $kolom berisi indeks kolom pada baris data
+     * (0 = nomor urut).
      */
     protected function samarkanUntukPemeriksa($response, array $kolom)
     {
@@ -256,8 +208,8 @@ abstract class BaseController extends Controller
     }
 
     /**
-     * Fase 5 — Samarkan NIK & NKK pada baris hasil cetak (array asosiatif)
-     * bila pengguna adalah Pemeriksa.
+     * Samarkan NIK & NKK pada baris hasil cetak (array asosiatif) bila
+     * pengguna adalah Pemeriksa.
      */
     protected function samarkanBarisCetak(array $rows): array
     {

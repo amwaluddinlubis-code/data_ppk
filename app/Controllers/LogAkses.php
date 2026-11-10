@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 /**
- * Fase 5 — Halaman Log Akses (hanya Admin PPK).
+ * Halaman Log Akses (hanya Admin Kabupaten).
  *
  * Menampilkan catatan akses data sensitif dari tabel `akses_log`
  * di basis data utama.

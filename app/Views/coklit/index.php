@@ -66,8 +66,8 @@
                             <td><span class="badge badge-ghost badge-sm"><?= esc($r['KET']) ?></span></td>
                             <td><?= esc($r['JENIS_KELAMIN']) ?></td>
                             <td class="text-right whitespace-nowrap">
-                                <a href="<?= base_url('coklit/edit/' . $r['UID']) ?>" class="btn btn-primary btn-xs"><i class="fas fa-edit"></i> UBAH</a>
-                                <form method="post" action="<?= base_url('coklit/hapus/' . $r['UID']) ?>" class="inline" onsubmit="return confirm('Hapus baris <?= esc($r['NAMA'], 'js') ?>? Salinannya tetap tersimpan di Riwayat dan bisa dipulihkan Admin.');">
+                                <a href="<?= base_url('coklit/edit/' . $r['ID']) ?>" class="btn btn-primary btn-xs"><i class="fas fa-edit"></i> UBAH</a>
+                                <form method="post" action="<?= base_url('coklit/hapus/' . $r['ID']) ?>" class="inline" onsubmit="return confirm('Hapus baris <?= esc($r['NAMA'], 'js') ?>? Salinannya tetap tersimpan di Riwayat dan bisa dipulihkan Admin.');">
                                     <?= csrf_field() ?>
                                     <button type="submit" class="btn btn-error btn-xs"><i class="fas fa-trash"></i> HAPUS</button>
                                 </form>

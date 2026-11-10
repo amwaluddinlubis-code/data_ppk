@@ -63,7 +63,7 @@ class Residu extends BaseController
             $builder->whereIn('NIK', $niks);
         }
 
-        $label = Coklit::labelKet();
+        $label = \App\Libraries\Keterangan::daftar();
         $json  = DataTable::of($builder)
             ->addNumbering()
             ->edit('KET', static fn ($row) => $label[(string) $row->KET] ?? (string) $row->KET)

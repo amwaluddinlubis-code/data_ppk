@@ -2,32 +2,46 @@
 
 namespace App\Commands;
 
+use App\Libraries\ImporCoklit;
+use App\Libraries\Keterangan;
+use App\Libraries\PembacaXlsx;
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Impor cepat data coklit dari konsol (10 Nov 2026).
+ * Impor cepat data coklit dari konsol.
  *
  * Untuk memasukkan data SATU KABUPATEN sekaligus ke basis data lokal —
  * pekerjaan yang berat lewat formulir web per kecamatan. Berkas boleh
- * satu berkas besar atau folder berisi banyak berkas (satu per
- * kecamatan); kecamatan setiap baris diambil dari kolom KEC berkas.
+ * satu berkas besar atau folder berisi banyak berkas; kecamatan setiap
+ * baris diambil dari kolom kecamatan berkas.
  *
- * Aturan baris sama persis dengan impor web: baris judul = nama kolom
- * mhc; kolom wajib NIK, NAMA, DESA, TPS, KET; NIK harus 16 angka.
+ * Dua format berkas dikenali otomatis dari baris judulnya:
+ * - Format aplikasi: judul adalah nama kolom mhc (KEC, DESA, KET, ...).
+ * - Format ekspor Sidalih: KECAMATAN, KELURAHAN, DPID, KETERANGAN, ...
+ *   (dipetakan ke kolom mhc oleh App\Libraries\ImporCoklit).
+ *
+ * Semua berkas dibaca MENGALIR baris demi baris (CSV lewat fgetcsv,
+ * XLSX lewat App\Libraries\PembacaXlsx), jadi berkas ratusan ribu
+ * baris tidak membebani memori.
  *
  * Contoh:
  *   php spark impor:massal D:\data-coklit
  *   php spark impor:massal berkas.csv --mode=ganti
- *   php spark impor:massal berkas-tanpa-kec.csv --kecamatan="RANTO BAEK"
+ *   php spark impor:massal MADINA.xlsx --prov="SUMATERA UTARA" --kab="MANDAILING NATAL"
  *
  * Mode tambah: baris yang persis sama sudah ada dilewati (aman
  * dijalankan ulang). Kunci pengecekannya gabungan UID+KET+DESA+TPS,
- * BUKAN UID saja — pada data coklit, satu UID dipakai bersama oleh
- * baris tersaring dan baris baru orang yang sama (pada data contoh:
- * 14.284 baris tetapi hanya 11.751 UID unik), jadi menyaring berdasar
- * UID saja akan membuang ±18% baris yang sah.
+ * BUKAN UID saja — satu UID dipakai bersama oleh baris tersaring dan
+ * baris baru orang yang sama, jadi menyaring berdasar UID saja akan
+ * membuang banyak baris yang sah.
+ *
+ * NIK adalah identitas unik pemilih: untuk baris AKTIF (MS) hanya
+ * baris pertama per NIK yang diterima; baris aktif berikutnya dengan
+ * NIK yang sama dialihkan (dihitung & dilaporkan sebagai baris
+ * teralih) karena satu NIK hanya boleh mempunyai satu baris aktif di
+ * seluruh kabupaten — sesuai kolom ter-generate NIK_AKTIF + indeks
+ * unik pada basis data. Baris tersaring tidak dibatasi NIK.
  * Mode ganti: data lama setiap kecamatan yang muncul di berkas
  * dicadangkan dulu ke writable/backup/ lalu diganti isi berkas.
  */
@@ -35,53 +49,60 @@ class ImporMassal extends BaseCommand
 {
     protected $group       = 'Pemilih';
     protected $name        = 'impor:massal';
-    protected $description = 'Impor cepat data coklit (mhc) dari satu berkas atau folder berisi banyak berkas CSV/XLSX.';
-    protected $usage       = 'impor:massal <path> [--mode=tambah|ganti] [--kecamatan=NAMA]';
+    protected $description = 'Impor cepat data coklit (mhc) dari berkas/folder CSV/XLSX, format aplikasi atau ekspor Sidalih.';
+    protected $usage       = 'impor:massal <path> [--mode=tambah|ganti] [--kecamatan=NAMA] [--format=auto|mhc|sidalih] [--prov=NAMA] [--kab=NAMA]';
     protected $arguments   = [
         'path' => 'Berkas CSV/XLSX, atau folder berisi berkas-berkas tersebut.',
     ];
     protected $options = [
         '--mode'      => 'tambah (bawaan) atau ganti.',
-        '--kecamatan' => 'Kecamatan tujuan bila berkas tidak mempunyai kolom KEC.',
+        '--kecamatan' => 'Kecamatan tujuan bila berkas tidak mempunyai kolom kecamatan.',
+        '--format'    => 'auto (bawaan), mhc, atau sidalih.',
+        '--prov'      => 'Provinsi untuk mengisi kolom PROV bila berkas tidak memuatnya (mis. ekspor Sidalih).',
+        '--kab'       => 'Kabupaten untuk mengisi kolom KAB bila berkas tidak memuatnya.',
     ];
 
-    private const KOLOM_MHC = [
-        'UID', 'ID', 'NKK', 'NIK', 'NAMA', 'TMPTLHR', 'TGLLHR', 'STATUS',
-        'JENIS_KELAMIN', 'ALAMAT', 'RT', 'RW', 'DISABILITAS', 'EKTP', 'KET',
-        'SUMBER', 'TPS', 'LAST_UPDATE', 'LAT', 'LONG', 'PROV', 'KAB', 'KEC',
-        'DESA', 'TGL_COKLIT',
-    ];
+    /** @var array<string, true> */
+    private array $kunciAda = [];
 
-    private array $kunciAda  = [];
-    private int $idBerikut   = 0;
-    private string $mode     = 'tambah';
+    /** @var array<string, true> NIK yang sudah mempunyai baris aktif. */
+    private array $nikAktifAda = [];
+    private string $mode = 'tambah';
     private ?string $kecPaksa = null;
+    private string $formatPaksa = 'auto';
+    private ?string $provIsi = null;
+    private ?string $kabIsi = null;
 
     public function run(array $params)
     {
-        // Terima juga bentuk --mode=ganti (parser CLI menyerahkannya
-        // sebagai kunci "mode=ganti" berval null, bukan opsi bernama).
+        // Terima juga bentuk --opsi=nilai (parser CLI menyerahkannya
+        // sebagai kunci "opsi=nilai" berval null, bukan opsi bernama).
         foreach ($params as $k => $v) {
-            if (is_string($k) && preg_match('/^(mode|kecamatan)=(.+)$/', $k, $cocok)) {
+            if (is_string($k) && preg_match('/^(mode|kecamatan|format|prov|kab)=(.+)$/', $k, $cocok)) {
                 $params[$cocok[1]] = $cocok[2];
             }
-            if (is_string($v) && preg_match('/^--(mode|kecamatan)=(.+)$/', $v, $cocok)) {
-                $params[$cocok[1]] = $cocok[2];
-            }
-        }
-        // sebagai segmen utuh, bukan opsi bernama).
-        foreach ($params as $v) {
-            if (is_string($v) && preg_match('/^--(mode|kecamatan)=(.+)$/', $v, $cocok)) {
+            if (is_string($v) && preg_match('/^--(mode|kecamatan|format|prov|kab)=(.+)$/', $v, $cocok)) {
                 $params[$cocok[1]] = $cocok[2];
             }
         }
-        $path = (string) ($params['path'] ?? $params[0] ?? '');
-        $this->mode = strtolower((string) ($params['mode'] ?? CLI::getOption('mode') ?? 'tambah'));
-        $kec = $params['kecamatan'] ?? CLI::getOption('kecamatan');
-        $this->kecPaksa = ($kec === null || trim((string) $kec) === '') ? null : strtoupper(trim((string) $kec));
+        $ambil = static function (string $nama) use ($params) {
+            $v = $params[$nama] ?? CLI::getOption($nama);
+            return ($v === null || trim((string) $v) === '') ? null : trim((string) $v);
+        };
+
+        $path             = (string) ($params['path'] ?? $params[0] ?? '');
+        $this->mode       = strtolower($ambil('mode') ?? 'tambah');
+        $this->kecPaksa   = ($k = $ambil('kecamatan')) === null ? null : strtoupper($k);
+        $this->formatPaksa = strtolower($ambil('format') ?? 'auto');
+        $this->provIsi    = ($p = $ambil('prov')) === null ? null : strtoupper($p);
+        $this->kabIsi     = ($p = $ambil('kab')) === null ? null : strtoupper($p);
 
         if (! in_array($this->mode, ['tambah', 'ganti'], true)) {
             CLI::error('Mode harus "tambah" atau "ganti".');
+            return EXIT_ERROR;
+        }
+        if (! in_array($this->formatPaksa, ['auto', 'mhc', 'sidalih'], true)) {
+            CLI::error('Format harus "auto", "mhc", atau "sidalih".');
             return EXIT_ERROR;
         }
         if ($path === '' || (! is_file($path) && ! is_dir($path))) {
@@ -106,10 +127,10 @@ class ImporMassal extends BaseCommand
         }
 
         $db = db_connect();
-        $this->idBerikut = (int) ($db->table('mhc')->selectMax('ID')->get()->getRowArray()['ID'] ?? 0);
         if ($this->mode === 'tambah') {
-            foreach ($db->table('mhc')->select('UID, KET, DESA, TPS')->get()->getResultArray() as $r) {
-                $this->kunciAda[self::kunciBaris($r['UID'], $r['KET'], $r['DESA'], $r['TPS'])] = true;
+            $query = $db->table('mhc')->select('UID, KET, DESA, TPS')->get();
+            while ($r = $query->getUnbufferedRow('array')) {
+                $this->kunciAda[ImporCoklit::kunciBaris($r['UID'], $r['KET'], $r['DESA'], $r['TPS'])] = true;
             }
         }
 
@@ -117,6 +138,7 @@ class ImporMassal extends BaseCommand
         $kecTersentuh = [];
         $totalMasuk = 0;
         $totalGagal = 0;
+        $totalTeralih = 0;
         foreach ($berkas as $f) {
             $hasil = $this->prosesBerkas($f);
             if ($hasil === null) {
@@ -124,6 +146,7 @@ class ImporMassal extends BaseCommand
             }
             $totalMasuk += $hasil['masuk'];
             $totalGagal += $hasil['gagal'];
+            $totalTeralih += $hasil['teralih'] ?? 0;
             foreach ($hasil['kecamatan'] as $k) {
                 $kecTersentuh[$k] = true;
             }
@@ -131,17 +154,20 @@ class ImporMassal extends BaseCommand
 
         CLI::write('');
         CLI::write('SELESAI. Total masuk: ' . number_format($totalMasuk) . ' baris; gagal/dilewati: ' . number_format($totalGagal) . ' baris.', 'green');
+        if ($totalTeralih > 0) {
+            CLI::write('  ' . number_format($totalTeralih) . ' baris di antaranya TERALIH karena NIK-nya sudah mempunyai baris aktif (kegandaan antar wilayah — baris pertama yang dipertahankan).', 'yellow');
+        }
         if ($kecTersentuh !== []) {
             CLI::write('');
             CLI::write('Rekonsiliasi basis data (kecamatan yang tersentuh):', 'yellow');
             $daftar = array_keys($kecTersentuh);
             sort($daftar);
             $rows = $db->table('mhc')
-                ->select("KEC, COUNT(*) AS total,
-                    SUM(KET IN ('0','U','B')) AS ms,
-                    SUM(KET = 'B') AS baru,
-                    SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
-                    SUM(KET = '8') AS pindah")
+                ->select('KEC, COUNT(*) AS total,
+                    SUM(KET IN (' . Keterangan::sqlMs() . ')) AS ms,
+                    SUM(KET = \'B\') AS baru,
+                    SUM(KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
+                    SUM(KET = \'8\') AS pindah', false)
                 ->whereIn('KEC', $daftar)
                 ->groupBy('KEC')
                 ->get()->getResultArray();
@@ -161,7 +187,7 @@ class ImporMassal extends BaseCommand
         return EXIT_SUCCESS;
     }
 
-    /** @return array{masuk:int, gagal:int, kecamatan:list<string>}|null */
+    /** @return array{masuk: int, gagal: int, kecamatan: list<string>}|null */
     private function prosesBerkas(string $pathBerkas): ?array
     {
         $nama = basename($pathBerkas);
@@ -169,50 +195,50 @@ class ImporMassal extends BaseCommand
         CLI::write('');
         CLI::write('Memproses ' . $nama . ' ...');
 
-        $baris = $this->bacaBerkas($pathBerkas);
-        if ($baris === null) {
-            CLI::error('  Dilewati: berkas tidak bisa dibaca / kosong.');
-            return null;
-        }
-
-        $judul = array_map(static fn ($c) => strtoupper(trim((string) $c)), $baris[0]);
-        $peta  = [];
-        foreach (self::KOLOM_MHC as $kolom) {
-            $idx = array_search($kolom, $judul, true);
-            if ($idx !== false) {
-                $peta[$kolom] = $idx;
-            }
-        }
-        foreach (['NIK', 'NAMA', 'DESA', 'TPS', 'KET'] as $wajib) {
-            if (! isset($peta[$wajib])) {
-                CLI::error('  Dilewati: kolom wajib "' . $wajib . '" tidak ada di baris judul.');
-                return null;
-            }
-        }
-
-        // Kecamatan yang muncul di berkas (untuk mode ganti & laporan)
-        $ambilKec = function (array $mentah) use ($peta) {
-            if (! isset($peta['KEC'])) {
-                return $this->kecPaksa;
-            }
-            $v = trim((string) ($mentah[$peta['KEC']] ?? ''));
-            return $v === '' ? $this->kecPaksa : strtoupper($v);
-        };
+        // -- Lintasan 1: judul, format, kecamatan yang muncul ----------
+        $judul = null;
         $kecSet = [];
-        for ($i = 1; $i < count($baris); $i++) {
-            $k = $ambilKec($baris[$i]);
+        foreach ($this->sumberBaris($pathBerkas) as $mentah) {
+            if ($judul === null) {
+                if ($this->barisKosong($mentah)) {
+                    continue;
+                }
+                $judul = array_map(static fn ($c) => strtoupper(trim((string) $c)), $mentah);
+                $format = $this->formatPaksa !== 'auto' ? $this->formatPaksa : ImporCoklit::deteksiFormat($judul);
+                if ($format === null) {
+                    CLI::error('  Dilewati: format berkas tidak dikenal (judul bukan format aplikasi maupun Sidalih).');
+                    return null;
+                }
+                $peta = ImporCoklit::petaKolom($judul, $format);
+                foreach (ImporCoklit::KOLOM_WAJIB as $wajib) {
+                    if (! isset($peta[$wajib])) {
+                        CLI::error('  Dilewati: kolom wajib "' . $wajib . '" tidak ada di berkas.');
+                        return null;
+                    }
+                }
+                continue;
+            }
+            if ($this->barisKosong($mentah)) {
+                continue;
+            }
+            $k = $this->kecamatanBaris($mentah, $peta);
             if ($k !== null) {
                 $kecSet[$k] = true;
             }
         }
-        if ($kecSet === []) {
-            CLI::error('  Dilewati: tidak ada kecamatan yang bisa ditentukan (kolom KEC kosong dan --kecamatan tidak diberikan).');
+        if ($judul === null) {
+            CLI::error('  Dilewati: berkas kosong / tidak bisa dibaca.');
             return null;
         }
+        if ($kecSet === []) {
+            CLI::error('  Dilewati: tidak ada kecamatan yang bisa ditentukan (kolom kecamatan kosong dan --kecamatan tidak diberikan).');
+            return null;
+        }
+        CLI::write('  Format: ' . strtoupper((string) $format) . '; kecamatan: ' . implode(', ', array_keys($kecSet)));
 
         $db = db_connect();
 
-        // Mode ganti: cadangkan + kosongkan per kecamatan dulu
+        // Mode ganti: cadangkan data lama per kecamatan dulu.
         $cadangan = [];
         if ($this->mode === 'ganti') {
             foreach (array_keys($kecSet) as $k) {
@@ -225,16 +251,49 @@ class ImporMassal extends BaseCommand
             }
         }
 
-        $siap  = [];
-        $gagal = [];
+        // Acuan PROV/KAB per kecamatan dari data yang sudah ada.
+        $acuanWilayah = [];
+        foreach (array_keys($kecSet) as $k) {
+            $r = $db->table('mhc')->select('PROV, KAB')->where('KEC', $k)->limit(1)->get()->getRowArray();
+            if ($r !== null) {
+                $acuanWilayah[$k] = $r;
+            }
+        }
+
+        // -- Lintasan 2: impor ------------------------------------------
+        $masuk   = 0;
+        $teralih = 0;
+        $gagal   = [];
+        $siap    = [];
         $db->transStart();
         try {
             if ($this->mode === 'ganti') {
                 $db->table('mhc')->whereIn('KEC', array_keys($kecSet))->delete();
             }
-            for ($i = 1; $i < count($baris); $i++) {
-                $mentah = $baris[$i];
-                $ambil  = static function (string $kolom) use ($peta, $mentah) {
+            // NIK yang masih mempunyai baris aktif (di luar yang baru
+            // diganti) menjadi penanda pengalihan baris aktif ganda.
+            $this->nikAktifAda = [];
+            $qAktif = $db->table('mhc')->select('NIK')
+                ->whereIn('KET', Keterangan::MS)->get();
+            while ($rA = $qAktif->getUnbufferedRow('array')) {
+                $this->nikAktifAda[(string) $rA['NIK']] = true;
+            }
+            $sudahJudul = false;
+            $nomor = 0;
+            foreach ($this->sumberBaris($pathBerkas) as $mentah) {
+                $nomor++;
+                if (! $sudahJudul) {
+                    // Baris judul = baris tidak kosong pertama.
+                    if ($this->barisKosong($mentah)) {
+                        continue;
+                    }
+                    $sudahJudul = true;
+                    continue;
+                }
+                if ($this->barisKosong($mentah)) {
+                    continue;
+                }
+                $ambil = static function (string $kolom) use ($peta, $mentah) {
                     if (! isset($peta[$kolom])) {
                         return null;
                     }
@@ -248,36 +307,58 @@ class ImporMassal extends BaseCommand
 
                 $nik = (string) $ambil('NIK');
                 if (! preg_match('/^\d{16}$/', $nik)) {
-                    $gagal[] = 'Baris ' . ($i + 1) . ': NIK tidak sah — dilewati.';
+                    $gagal[] = 'Baris ' . $nomor . ': NIK tidak sah — dilewati.';
                     continue;
                 }
-                $uid = $ambil('UID');
-                if ($uid === null) {
-                    $uid = strtoupper(bin2hex(random_bytes(8)));
+                if ($ambil('NAMA') === null || $ambil('DESA') === null || $ambil('TPS') === null) {
+                    $gagal[] = 'Baris ' . $nomor . ': NAMA/DESA/TPS kosong — dilewati.';
+                    continue;
+                }
+                $ket = (string) $ambil('KET');
+                if (! array_key_exists($ket, Keterangan::daftar())) {
+                    $gagal[] = 'Baris ' . $nomor . ': kode keterangan "' . $ket . '" tidak dikenal — dilewati.';
+                    continue;
                 }
 
                 $row = [];
-                foreach (self::KOLOM_MHC as $kolom) {
+                foreach (ImporCoklit::KOLOM_MHC as $kolom) {
                     $row[$kolom] = $ambil($kolom);
                 }
-                $row['UID'] = $uid;
+                $row['UID'] ??= strtoupper(bin2hex(random_bytes(8)));
+                $kecBaris = $this->kecamatanBaris($mentah, $peta);
+                $row['KEC'] = $kecBaris ?? $row['KEC'];
+                if ($row['PROV'] === null) {
+                    $row['PROV'] = $this->provIsi ?? ($acuanWilayah[$row['KEC']]['PROV'] ?? null);
+                }
+                if ($row['KAB'] === null) {
+                    $row['KAB'] = $this->kabIsi ?? ($acuanWilayah[$row['KEC']]['KAB'] ?? null);
+                }
+                $row['TGL_COKLIT'] = ImporCoklit::normalisasiTanggal($row['TGL_COKLIT']);
+                if ($format === 'sidalih') {
+                    $row['LAST_UPDATE'] = ImporCoklit::normalisasiTanggal($row['LAST_UPDATE']);
+                }
+
+                if (Keterangan::isMs($ket)) {
+                    if (isset($this->nikAktifAda[$nik])) {
+                        $gagal[] = 'Baris ' . $nomor . ': NIK sudah mempunyai baris aktif — dialihkan (satu NIK satu baris aktif).';
+                        $teralih++;
+                        continue;
+                    }
+                    $this->nikAktifAda[$nik] = true;
+                }
                 if ($this->mode === 'tambah') {
-                    $kunci = self::kunciBaris($row['UID'], $row['KET'], $row['DESA'], $row['TPS']);
+                    $kunci = ImporCoklit::kunciBaris($row['UID'], $row['KET'], $row['DESA'], $row['TPS']);
                     if (isset($this->kunciAda[$kunci])) {
-                        $gagal[] = 'Baris ' . ($i + 1) . ': baris yang sama (UID+KET+Desa+TPS) sudah ada — dilewati.';
+                        $gagal[] = 'Baris ' . $nomor . ': baris yang sama (UID+KET+Desa+TPS) sudah ada — dilewati.';
                         continue;
                     }
                     $this->kunciAda[$kunci] = true;
                 }
-                $idFile = $ambil('ID');
-                $row['ID'] = ($this->mode === 'tambah' || $idFile === null) ? ++$this->idBerikut : (int) $idFile;
-                if ($this->mode === 'ganti' && $idFile !== null) {
-                    $this->idBerikut = max($this->idBerikut, (int) $idFile);
-                }
-                $row['TGL_COKLIT'] = $this->normalisasiTanggal($row['TGL_COKLIT']);
-                $row['KEC'] = $ambilKec($mentah) ?? $row['KEC'];
+                // ID tidak diisi dari berkas: kini AUTO_INCREMENT.
+                unset($row['ID']);
 
                 $siap[] = $row;
+                $masuk++;
                 if (count($siap) >= 500) {
                     $db->table('mhc')->insertBatch($siap);
                     $siap = [];
@@ -297,7 +378,6 @@ class ImporMassal extends BaseCommand
             return null;
         }
 
-        $masuk = (count($baris) - 1) - count($gagal);
         $db->table('impor_log')->insert([
             'jenis'             => 'mhc',
             'mode'              => $this->mode,
@@ -311,10 +391,10 @@ class ImporMassal extends BaseCommand
         ]);
 
         CLI::write(sprintf(
-            '  Masuk %s baris; gagal/dilewati %s; kecamatan: %s; %.1f detik.',
+            '  Masuk %s baris; gagal/dilewati %s (termasuk %s teralih NIK aktif ganda); %.1f detik.',
             number_format($masuk),
             number_format(count($gagal)),
-            implode(', ', array_keys($kecSet)),
+            number_format($teralih),
             microtime(true) - $awal
         ), 'green');
         foreach (array_slice($gagal, 0, 5) as $g) {
@@ -324,89 +404,64 @@ class ImporMassal extends BaseCommand
             CLI::write('  - ... dan ' . (count($gagal) - 5) . ' baris gagal lainnya.');
         }
 
-        return ['masuk' => $masuk, 'gagal' => count($gagal), 'kecamatan' => array_keys($kecSet)];
+        return ['masuk' => $masuk, 'gagal' => count($gagal), 'teralih' => $teralih, 'kecamatan' => array_keys($kecSet)];
     }
 
-    /** Kunci identitas satu baris coklit untuk mode tambah. */
-    private static function kunciBaris($uid, $ket, $desa, $tps): string
+    /** Kecamatan satu baris (dari kolomnya, atau paksaan opsi). */
+    private function kecamatanBaris(array $mentah, array $peta): ?string
     {
-        return implode('|', [
-            strtoupper(trim((string) $uid)),
-            strtoupper(trim((string) $ket)),
-            strtoupper(trim((string) $desa)),
-            trim((string) $tps),
-        ]);
+        if (! isset($peta['KEC'])) {
+            return $this->kecPaksa;
+        }
+        $v = trim((string) ($mentah[$peta['KEC']] ?? ''));
+
+        return $v === '' ? $this->kecPaksa : strtoupper($v);
     }
 
-    /** Baca CSV (mengalir, hemat memori) atau XLSX/XLS (PhpSpreadsheet). */
-    private function bacaBerkas(string $pathBerkas): ?array
+    private function barisKosong(array $mentah): bool
+    {
+        foreach ($mentah as $v) {
+            if ($v !== null && trim((string) $v) !== '') {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Sumber baris mengalir: CSV lewat fgetcsv, XLSX lewat PembacaXlsx.
+     * XLS lama (.xls) ditolak dengan pesan jelas (konversi dulu).
+     *
+     * @return \Generator<int, array>
+     */
+    private function sumberBaris(string $pathBerkas): \Generator
     {
         $ext = strtolower(pathinfo($pathBerkas, PATHINFO_EXTENSION));
-        try {
-            if ($ext === 'csv') {
-                $fh = fopen($pathBerkas, 'r');
-                if ($fh === false) {
-                    return null;
-                }
-                $kepala = fgets($fh);
-                if ($kepala === false) {
-                    fclose($fh);
-                    return null;
-                }
-                $pemisah = substr_count($kepala, ';') > substr_count($kepala, ',') ? ';' : ',';
-                rewind($fh);
-                $baris = [];
-                while (($r = fgetcsv($fh, 0, $pemisah)) !== false) {
-                    $kosong = true;
-                    foreach ($r as $v) {
-                        if ($v !== null && trim((string) $v) !== '') {
-                            $kosong = false;
-                            break;
-                        }
-                    }
-                    if (! $kosong) {
-                        $baris[] = $r;
-                    }
-                }
+        if ($ext === 'csv') {
+            $fh = fopen($pathBerkas, 'r');
+            if ($fh === false) {
+                return;
+            }
+            $kepala = fgets($fh);
+            if ($kepala === false) {
                 fclose($fh);
-            } else {
-                $reader = IOFactory::createReaderForFile($pathBerkas);
-                $reader->setReadDataOnly(true);
-                $sheet = $reader->load($pathBerkas)->getActiveSheet();
-                $baris = array_values(array_filter(
-                    $sheet->toArray(null, true, false, false),
-                    static function ($r) {
-                        foreach ((array) $r as $v) {
-                            if ($v !== null && trim((string) $v) !== '') {
-                                return true;
-                            }
-                        }
-                        return false;
-                    }
-                ));
+                return;
             }
-        } catch (\Throwable) {
-            return null;
-        }
-
-        return count($baris) >= 2 ? $baris : null;
-    }
-
-    private function normalisasiTanggal($nilai): ?string
-    {
-        if ($nilai === null || $nilai === '') {
-            return null;
-        }
-        if (is_numeric($nilai)) {
-            try {
-                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $nilai)->format('Y-m-d');
-            } catch (\Throwable) {
-                return null;
+            $pemisah = substr_count($kepala, ';') > substr_count($kepala, ',') ? ';' : ',';
+            rewind($fh);
+            while (($r = fgetcsv($fh, 0, $pemisah)) !== false) {
+                yield $r;
             }
+            fclose($fh);
+            return;
         }
-        $ts = strtotime((string) $nilai);
-
-        return $ts === false ? null : date('Y-m-d', $ts);
+        if ($ext === 'xlsx') {
+            $pembaca = new PembacaXlsx($pathBerkas);
+            yield from $pembaca->baris();
+            return;
+        }
+        CLI::error('  Dilewati: format .' . $ext . ' tidak didukung perintah ini (pakai CSV/XLSX).');
     }
 
     /** Ekspor mhc satu kecamatan ke CSV cadangan. Null bila gagal. */
@@ -424,14 +479,14 @@ class ImporMassal extends BaseCommand
             return null;
         }
         try {
-            fputcsv($fh, self::KOLOM_MHC);
+            fputcsv($fh, ImporCoklit::KOLOM_MHC);
             $query = db_connect()->table('mhc')
-                ->select(implode(',', self::KOLOM_MHC))
+                ->select(implode(',', ImporCoklit::KOLOM_MHC))
                 ->where('KEC', $kec)
                 ->get();
             while ($row = $query->getUnbufferedRow('array')) {
                 $urut = [];
-                foreach (self::KOLOM_MHC as $k) {
+                foreach (ImporCoklit::KOLOM_MHC as $k) {
                     $urut[] = $row[$k] ?? null;
                 }
                 fputcsv($fh, $urut);

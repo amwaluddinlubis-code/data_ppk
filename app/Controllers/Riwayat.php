@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Models\RiwayatModel;
 
 /**
- * Fase 2 — Halaman Riwayat Perubahan (jejak audit data coklit).
+ * Halaman Riwayat Perubahan (jejak audit data coklit).
  *
  * Terbaca oleh Admin PPK & Operator. Pemulihan baris yang terhapus
  * hanya oleh Admin PPK.
@@ -90,6 +90,9 @@ class Riwayat extends BaseController
             return redirect()->to('riwayat')->with('galat', 'Baris dengan UID itu sudah ada — mungkin sudah dipulihkan.');
         }
 
+        // ID lama tidak dipakai lagi: kunci pokok dibangkitkan basis
+        // data agar tidak bertabrakan dengan baris yang sudah ada.
+        unset($baris['ID'], $baris['NIK_AKTIF']);
         $db->transStart();
         $db->table('mhc')->insert($baris);
         $model->catat('pulih', null, $baris);

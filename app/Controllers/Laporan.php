@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 /**
- * Laporan ringkasan per desa & per TPS (Fase 4, wilayah Fase 7).
+ * Laporan ringkasan per desa & per TPS.
  *
  * Semua angka dihitung langsung dari data coklit dan view turunannya,
  * mengikuti wilayah efektif: PPK melihat kecamatannya, PPS desanya,

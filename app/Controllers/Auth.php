@@ -5,7 +5,7 @@ namespace App\Controllers;
 use App\Models\UserModel;
 
 /**
- * Fase 1 — Login, keluar, ganti sandi, dan kelola pengguna (admin).
+ * Login, keluar, ganti sandi, dan kelola pengguna (admin).
  *
  * Halaman login/keluar bersifat publik; semua metode lain berada di
  * balik filter `auth` (lihat Routes.php). Kelola pengguna hanya untuk

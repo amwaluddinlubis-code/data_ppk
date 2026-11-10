@@ -2,15 +2,19 @@
 
 namespace App\Controllers;
 
+use App\Libraries\Keterangan;
 use \Hermawan\DataTables\DataTable;
 
 /**
- * Dasbor (Fase 7 — rupa Arah 2: kartu statistik besar).
+ * Dasbor (rupa kartu statistik; menu ala Sidalih).
  *
  * Semua angka mengikuti wilayah efektif sesi: kabupaten penuh untuk
- * Admin, kecamatan cakupan untuk PPK, desa cakupan untuk PPS.
- * Bagian bawah halaman tetap tabel Hasil Coklit Pantarlih yang bisa
- * disaring per desa/TPS/KET/jenis kelamin seperti sebelumnya.
+ * Admin, kecamatan cakupan untuk PPK, desa cakupan untuk PPS. Bagian
+ * bawah halaman adalah tabel Hasil Coklit Pantarlih yang bisa disaring
+ * per desa/TPS/keterangan/jenis kelamin.
+ *
+ * Bangun ulang 2026: daftar kode MS/TMS tidak lagi ditulis mentah di
+ * SQL, melainkan diambil dari App\Libraries\Keterangan.
  */
 class Dashboard extends BaseController
 {
@@ -23,13 +27,13 @@ class Dashboard extends BaseController
         $b = $db->table('mhc');
         $this->saringWilayah($b);
         $ringkas = $b->select(
-            "COUNT(*) AS total,
-             SUM(KET IN ('0','U','B')) AS ms,
-             SUM(KET = 'B') AS baru,
-             SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
-             SUM(KET = '8') AS pindah,
+            'COUNT(*) AS total,
+             SUM(KET IN (' . Keterangan::sqlMs() . ')) AS ms,
+             SUM(KET = \'B\') AS baru,
+             SUM(KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
+             SUM(KET = \'8\') AS pindah,
              COUNT(DISTINCT DESA) AS jumlah_desa,
-             COUNT(DISTINCT DESA, TPS) AS jumlah_tps",
+             COUNT(DISTINCT DESA, TPS) AS jumlah_tps',
             false
         )->get()->getRowArray();
 
@@ -53,34 +57,34 @@ class Dashboard extends BaseController
         $this->saringWilayah($bW);
         if ($perKecamatan) {
             $perWilayah = $bW->select(
-                "KEC AS wilayah,
+                'KEC AS wilayah,
                  COUNT(*) AS total,
-                 SUM(KET IN ('0','U','B')) AS ms,
-                 SUM(KET = 'B') AS baru,
-                 SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
-                 SUM(KET = '8') AS pindah,
+                 SUM(KET IN (' . Keterangan::sqlMs() . ')) AS ms,
+                 SUM(KET = \'B\') AS baru,
+                 SUM(KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
+                 SUM(KET = \'8\') AS pindah,
                  COUNT(DISTINCT DESA) AS jumlah_desa,
-                 COUNT(DISTINCT DESA, TPS) AS jumlah_tps",
+                 COUNT(DISTINCT DESA, TPS) AS jumlah_tps',
                 false
             )->groupBy('KEC')->orderBy('KEC')->get()->getResultArray();
         } else {
             $perWilayah = $bW->select(
-                "DESA AS wilayah,
+                'DESA AS wilayah,
                  COUNT(*) AS total,
-                 SUM(KET IN ('0','U','B')) AS ms,
-                 SUM(KET = 'B') AS baru,
-                 SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
-                 SUM(KET = '8') AS pindah,
-                 COUNT(DISTINCT TPS) AS jumlah_tps",
+                 SUM(KET IN (' . Keterangan::sqlMs() . ')) AS ms,
+                 SUM(KET = \'B\') AS baru,
+                 SUM(KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
+                 SUM(KET = \'8\') AS pindah,
+                 COUNT(DISTINCT TPS) AS jumlah_tps',
                 false
             )->groupBy('DESA')->orderBy('DESA')->get()->getResultArray();
         }
 
-        $data['title'] = 'Dasbor — Data Pemilih';
+        $data['title']      = 'Dasbor — Data Pemilih';
         $data['title_page'] = 'Dasbor Data Pemilih';
-        $data['kecamatan'] = $this->kec;
-        $data['kabupaten'] = $this->kab;
-        $data['stats'] = [
+        $data['kecamatan']  = $this->kec;
+        $data['kabupaten']  = $this->kab;
+        $data['stats']      = [
             'total'     => (int) ($ringkas['total'] ?? 0),
             'ms'        => (int) ($ringkas['ms'] ?? 0),
             'baru'      => (int) ($ringkas['baru'] ?? 0),
@@ -92,32 +96,41 @@ class Dashboard extends BaseController
             'laki'      => (int) ($lp['laki'] ?? 0),
             'perempuan' => (int) ($lp['perempuan'] ?? 0),
         ];
-        $data['perWilayah'] = $perWilayah;
+        $data['perWilayah']   = $perWilayah;
         $data['perKecamatan'] = $perKecamatan;
-        $data['arrDesa'] = $this->daftarDesa();
+        $data['arrDesa']      = $this->daftarDesa();
 
         return view('dashboard', $data);
     }
 
     public function getPemilih()
     {
-        $db = db_connect();
+        $db   = db_connect();
         $desa = $this->request->getPost('desa');
-        $tps = $this->request->getPost('tps');
-        $ket = $this->request->getPost('tms');
-        $lp = $this->request->getPost('lp');
+        $tps  = $this->request->getPost('tps');
+        $ket  = (string) $this->request->getPost('tms');
+        $lp   = $this->request->getPost('lp');
+
         $builder = $db->table('mhc')->select('DESA, TPS, NKK, NIK, NAMA, TGLLHR, LEFT(LAST_UPDATE,10) AS LU, KET, JENIS_KELAMIN');
         $this->saringWilayah($builder);
-        if ($desa != '') $builder->where('DESA', $desa);
-        if ($tps != '') $builder->where('TPS', $tps);
-        if ($lp != '') $builder->where('JENIS_KELAMIN', $lp);
-        if ($ket != '') {
-            if ($ket == 0 or $ket == 'B' or $ket == 'U') {
+        if ($desa != '') {
+            $builder->where('DESA', $desa);
+        }
+        if ($tps != '') {
+            $builder->where('TPS', $tps);
+        }
+        if ($lp != '') {
+            $builder->where('JENIS_KELAMIN', $lp);
+        }
+        if ($ket !== '') {
+            if (Keterangan::isMs($ket)) {
                 $builder->where('KET', $ket);
-            } elseif ($ket == 'TMS') {
-                $builder->whereIn('KET', ['0','B','U']);
+            } elseif ($ket === 'TMS') {
+                // Nilai 'TMS' pada pilihan berarti "Pemilih Memenuhi Syarat"
+                // (warisan penamaan aplikasi asal; dipertahankan).
+                $builder->whereIn('KET', Keterangan::MS);
             } else {
-                $builder->whereIn('KET', [1, 2, 3, 4, 5, 6, 7, 8]);
+                $builder->whereIn('KET', Keterangan::TMS);
             }
         }
 
