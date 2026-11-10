@@ -1,7 +1,7 @@
 <?= $this->extend('layout/main') ?>
 
 <?= $this->section('content') ?>
-<div class="card bg-base-100 shadow" x-data="{ memuat: false }"
+<div class="card bg-base-100 shadow" data-filter-panel x-data="{ memuat: false }"
      @htmx:before-request="memuat = true" @htmx:after-request="memuat = false">
     <div class="card-body p-4">
         <div class="flex items-center gap-2 mb-2">
@@ -9,7 +9,7 @@
                 <span class="loading loading-spinner loading-xs"></span> Memuat…
             </span>
         </div>
-        <div class="flex flex-wrap items-end gap-3 mb-4">
+        <div class="flex flex-wrap items-end gap-3 mb-4" data-filter-controls>
             <label class="form-control w-full sm:w-60">
                 <span class="label"><span class="label-text font-semibold">DESA</span></span>
                 <select class="select select-bordered select-sm" id="DESA" name="desa"
@@ -44,15 +44,15 @@
                     <option value="P">PEREMPUAN</option>
                 </select>
             </label>
-            <div class="flex gap-2">
-                <button type="button" class="btn btn-primary btn-sm"
+            <div class="flex flex-wrap gap-2">
+                <button type="button" class="btn btn-primary btn-sm" data-filter-apply
                         hx-get="<?= base_url('pemilih/tabelAktif') ?>" hx-target="#wadah-tabel-aktif" hx-swap="innerHTML"
                         hx-include="[name='desa'],[name='tps'],[name='lp'],[name='cari']">
                     <i class="fas fa-filter"></i> FILTER
                 </button>
-                <a href="<?= base_url('pemilih/aktifPrint') ?>" class="btn btn-error btn-sm">
-                    <i class="fas fa-undo"></i> RESET FILTER
-                </a>
+                <button type="button" class="btn btn-ghost btn-sm" data-filter-reset>
+                    <i class="fas fa-undo"></i> RESET
+                </button>
                 <button type="button" class="btn btn-success btn-sm" onclick="printPdf()">
                     <i class="fas fa-print"></i> CETAK DPS
                 </button>
@@ -68,6 +68,7 @@
             </div>
         </div>
 
+        <div class="mb-4 flex flex-wrap gap-2" data-filter-chips aria-live="polite" aria-label="Filter aktif" hidden></div>
         <div id="wadah-tabel-aktif">
             <?= view('pemilih/_tabel_aktif', $tabelAwal) ?>
         </div>

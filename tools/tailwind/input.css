@@ -40,6 +40,20 @@
 
   .table thead th {
     @apply text-[11px] font-bold uppercase tracking-wider;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: oklch(var(--b2));
+  }
+
+  .table:has(thead th:nth-child(7)) {
+    min-width: 56rem;
+  }
+
+  .overflow-x-auto:has(> .table) {
+    max-height: min(70vh, 40rem);
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 
   .table tbody tr {
@@ -68,5 +82,10 @@
     border: 0 !important;
     box-shadow: none !important;
     transition: none !important;
+  }
+
+  .overflow-x-auto:has(> .table) {
+    max-height: none;
+    overflow: visible;
   }
 }

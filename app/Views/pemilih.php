@@ -1,7 +1,7 @@
 <?= $this->extend('layout/main') ?>
 
 <?= $this->section('content') ?>
-<div class="card bg-base-100 shadow" x-data="{ memuat: false }"
+<div class="card bg-base-100 shadow" data-filter-panel x-data="{ memuat: false }"
      @htmx:before-request="memuat = true" @htmx:after-request="memuat = false">
     <div class="card-body p-4">
         <div class="flex items-center gap-2 mb-2">
@@ -9,7 +9,7 @@
                 <span class="loading loading-spinner loading-xs"></span> Memuat…
             </span>
         </div>
-        <div class="flex flex-wrap items-end gap-3 mb-4">
+        <div class="flex flex-wrap items-end gap-3 mb-4" data-filter-controls>
             <label class="form-control w-full sm:w-60">
                 <span class="label"><span class="label-text font-semibold">DESA</span></span>
                 <select class="select select-bordered select-sm" id="DESA" name="desa"
@@ -52,15 +52,15 @@
                        hx-get="<?= base_url('pemilih/tabelPindah') ?>" hx-target="#wadah-tabel-pindah" hx-swap="innerHTML"
                        hx-trigger="input changed delay:500ms" hx-include="[name='desa'],[name='tps'],[name='lp'],[name='stat']">
             </label>
-            <div class="flex gap-2">
-                <button type="button" class="btn btn-primary btn-sm"
+            <div class="flex flex-wrap gap-2">
+                <button type="button" class="btn btn-primary btn-sm" data-filter-apply
                         hx-get="<?= base_url('pemilih/tabelPindah') ?>" hx-target="#wadah-tabel-pindah" hx-swap="innerHTML"
                         hx-include="[name='desa'],[name='tps'],[name='lp'],[name='stat'],[name='cari']">
                     <i class="fas fa-filter"></i> FILTER
                 </button>
-                <a href="<?= base_url('pemilih') ?>" class="btn btn-error btn-sm">
-                    <i class="fas fa-undo"></i> RESET FILTER
-                </a>
+                <button type="button" class="btn btn-ghost btn-sm" data-filter-reset>
+                    <i class="fas fa-undo"></i> RESET
+                </button>
                 <button type="button" class="btn btn-outline btn-sm" onclick="eksporData('csv')">
                     <i class="fas fa-file-csv"></i> EKSPOR CSV
                 </button>
@@ -70,6 +70,7 @@
             </div>
         </div>
 
+        <div class="mb-4 flex flex-wrap gap-2" data-filter-chips aria-live="polite" aria-label="Filter aktif" hidden></div>
         <div id="wadah-tabel-pindah">
             <?= view('pemilih/_tabel_pindah', $tabelAwal) ?>
         </div>

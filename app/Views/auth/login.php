@@ -1,3 +1,4 @@
+<?php $assetBase = rtrim((string) parse_url(base_url('assets/'), PHP_URL_PATH), '/') . '/'; ?>
 <!DOCTYPE html>
 <html lang="id" data-theme="terang">
 <head>
@@ -12,8 +13,8 @@
             document.documentElement.setAttribute('data-theme', tema === 'gelap' ? 'gelap' : 'terang');
         })();
     </script>
-    <link rel="stylesheet" href="<?= base_url('assets/fontawesome/css/all.min.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
+    <link rel="stylesheet" href="<?= esc($assetBase . 'fontawesome/css/all.min.css', 'attr') ?>">
+    <link rel="stylesheet" href="<?= esc($assetBase . 'css/app.css', 'attr') ?>">
 </head>
 <body class="min-h-screen bg-base-200 text-base-content">
     <main class="grid min-h-screen lg:grid-cols-[1.08fr_0.92fr]">
