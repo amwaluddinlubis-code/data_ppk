@@ -238,3 +238,37 @@ Desain ulang tampilan (Tailwind + DaisyUI, CSS dikompilasi ulang):
   navbar, pilihan tersimpan di peramban.
 - **UI mobile**: navigasi bawah (Dasbor, Pemilih MS, Coklit,
   Wilayah, Menu) dan kartu statistik dua kolom di HP.
+
+## Perbaikan Audit (10 November 2026) — T1 & T2
+
+Hasil audit menyeluruh sesudah Fase 7 (±45 pemeriksaan; tanpa bug
+kritis). Dua temuan kecil warisan aplikasi asal diperbaiki lewat
+migration `2026-11-10-110000_PerbaikanViewBaruDanKodeTms`:
+
+- **T1**: view `pemilihbaru2` menggandakan baris pemilih baru yang
+  NIK-nya punya lebih dari satu baris tersaring. OLD_NAMA/OLD_DESA kini
+  diambil lewat subkueri skalar (satu baris tersaring terawal per NIK) —
+  halaman Pemilih Baru kini persis sama dengan hitungan kode B.
+- **T2**: kode keterangan TMS dilengkapi sesuai standar coklit
+  (4 = Pindah Domisili, 5 = WNA) pada view `tersaring`/`pemilih_active`,
+  hitungan Dashboard & Laporan, label formulir Coklit, dan saringan
+  halaman Tersaring. Kini MS + Tersaring = Total dan Pemilih Aktif = MS.
+
+Sesudah `git pull`, jalankan `php spark migrate` seperti biasa.
+
+## Analisis Kegandaan NIK (10 November 2026)
+
+Halaman **NIK Ganda** ditulis ulang: analisis kini cukup memperhatikan
+NIK pada seluruh data coklit (menggantikan view lama
+`analisis_nik_ganda` yang hanya melihat duplikat di dalam daftar MS).
+
+- **Antar Kecamatan**: satu NIK tercatat di lebih dari satu kecamatan.
+- **Antar Desa**: satu NIK tercatat di lebih dari satu desa/kelurahan
+  dalam kecamatan yang sama.
+
+Kegandaan di dalam desa yang sama tidak ditampilkan (pola normal
+coklit). Kelompok ganda dibatasi pada yang menyentuh wilayah pengguna
+(PPK kecamatannya, PPS desanya), tetapi semua baris NIK kelompok itu
+ditampilkan termasuk baris di wilayah seberang. Ada kartu ringkasan
+per kategori dan saringan kategori. NIK/NKK Pemeriksa tetap tersamar.
+Tidak perlu migration: tidak ada perubahan skema.

@@ -26,7 +26,7 @@ class Dashboard extends BaseController
             "COUNT(*) AS total,
              SUM(KET IN ('0','U','B')) AS ms,
              SUM(KET = 'B') AS baru,
-             SUM(KET IN ('1','2','3','6','7','8')) AS tersaring,
+             SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
              SUM(KET = '8') AS pindah,
              COUNT(DISTINCT DESA) AS jumlah_desa,
              COUNT(DISTINCT DESA, TPS) AS jumlah_tps",
@@ -57,7 +57,7 @@ class Dashboard extends BaseController
                  COUNT(*) AS total,
                  SUM(KET IN ('0','U','B')) AS ms,
                  SUM(KET = 'B') AS baru,
-                 SUM(KET IN ('1','2','3','6','7','8')) AS tersaring,
+                 SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
                  SUM(KET = '8') AS pindah,
                  COUNT(DISTINCT DESA) AS jumlah_desa,
                  COUNT(DISTINCT DESA, TPS) AS jumlah_tps",
@@ -69,7 +69,7 @@ class Dashboard extends BaseController
                  COUNT(*) AS total,
                  SUM(KET IN ('0','U','B')) AS ms,
                  SUM(KET = 'B') AS baru,
-                 SUM(KET IN ('1','2','3','6','7','8')) AS tersaring,
+                 SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
                  SUM(KET = '8') AS pindah,
                  COUNT(DISTINCT TPS) AS jumlah_tps",
                 false
@@ -117,7 +117,7 @@ class Dashboard extends BaseController
             } elseif ($ket == 'TMS') {
                 $builder->whereIn('KET', ['0','B','U']);
             } else {
-                $builder->whereIn('KET', [1, 2, 3, 6, 7, 8]);
+                $builder->whereIn('KET', [1, 2, 3, 4, 5, 6, 7, 8]);
             }
         }
 

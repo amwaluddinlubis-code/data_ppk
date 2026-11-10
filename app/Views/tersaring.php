@@ -29,6 +29,8 @@
                     <option value="1">1 - MENINGGAL</option>
                     <option value="2">2 - GANDA</option>
                     <option value="3">3 - DI BAWAH UMUR</option>
+                    <option value="4">4 - PINDAH DOMISILI</option>
+                    <option value="5">5 - WNA</option>
                     <option value="6">6 - TNI</option>
                     <option value="7">7 - POLRI</option>
                     <option value="8">8 - SALAH PENEMPATAN TPS</option>
