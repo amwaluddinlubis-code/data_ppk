@@ -272,3 +272,26 @@ coklit). Kelompok ganda dibatasi pada yang menyentuh wilayah pengguna
 ditampilkan termasuk baris di wilayah seberang. Ada kartu ringkasan
 per kategori dan saringan kategori. NIK/NKK Pemeriksa tetap tersamar.
 Tidak perlu migration: tidak ada perubahan skema.
+
+## Impor Cepat Satu Kabupaten (10 November 2026) — via Konsol
+
+Untuk memasukkan data seluruh kabupaten sekaligus ke basis data lokal
+tanpa mengunggah satu per satu lewat web:
+
+```
+php spark impor:massal D:\folder-data-coklit
+php spark impor:massal berkas.csv --mode ganti
+php spark impor:massal berkas-tanpa-kolom-kec.csv --kecamatan "RANTO BAEK"
+```
+
+- Path boleh satu berkas atau folder (semua CSV/XLSX di dalamnya
+  diproses berurutan). Kecamatan setiap baris diambil dari kolom KEC.
+- Aturan baris sama dengan impor web (judul = nama kolom mhc; NIK
+  wajib 16 angka). Di akhir tampil rekonsiliasi per kecamatan.
+- **Mode tambah** (bawaan) aman dijalankan ulang: baris yang persis
+  sama dilewati. Kuncinya gabungan UID+KET+Desa+TPS — bukan UID saja,
+  karena pada data coklit satu UID dipakai bersama oleh baris
+  tersaring dan baris baru orang yang sama.
+- **Mode ganti**: data lama kecamatan yang muncul di berkas
+  dicadangkan dulu ke `writable/backup/` lalu diganti isi berkas.
+- Pencatatan masuk `impor_log` dengan pengguna `konsol`.
