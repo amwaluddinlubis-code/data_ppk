@@ -2,44 +2,39 @@
 
 namespace App\Controllers;
 
+use App\Libraries\ImporCoklit;
+use App\Libraries\Keterangan;
+use App\Libraries\WilayahMaster;
 use App\Models\RiwayatModel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 /**
- * Fase 3 — Impor data dari CSV/Excel.
+ * Impor data dari CSV/Excel lewat web.
  *
  * Dua jenis impor:
- * 1. Data coklit (`mhc`) — mode GANTI (timpa semua, dengan cadangan
- *    CSV otomatis terlebih dahulu) atau TAMBAH (lewati UID yang
- *    sudah ada). Baris pertama berkas = nama kolom seperti kolom mhc
- *    (NIK, NKK, NAMA, DESA, TPS, KET, ...). Sesudah impor ditampilkan
- *    REKONSILIASI: hitungan daftar turunan (MS, Tersaring, Baru,
- *    Pindah TPS) dari basis data — karena semuanya VIEW di atas mhc,
- *    tidak ada lagi langkah "analisis" manual.
- * 2. Keterangan status (`tms8`) — kolom NIK + STATUS; baris yang NIK-nya
- *    sudah ada diperbarui, yang belum ada ditambahkan.
+ * 1. Data coklit (`mhc`) — mode GANTI (timpa kecamatan tujuan, dengan
+ *    cadangan CSV otomatis terlebih dahulu) atau TAMBAH (lewati baris
+ *    yang sama persis). Dua format berkas dikenali: format aplikasi
+ *    (judul = nama kolom mhc + KEC/DESA) dan format ekspor Sidalih
+ *    (KEC_ID/KECAMATAN/KEL_ID/KELURAHAN/DPID/KETERANGAN).
+ * 2. Keterangan status (`tms8`) — kolom NIK + STATUS; baris yang
+ *    NIK-nya sudah ada diperbarui, yang belum ada ditambahkan.
+ *
+ * WILAYAH TERNORMALISASI (Skema Final 2026): wilayah baris diselesaikan
+ * ke tabel master lewat App\Libraries\WilayahMaster dan mhc hanya
+ * menyimpan `kelurahan_id`. Impor selalu UNTUK SATU kecamatan tujuan:
+ * mode GANTI hanya menimpa baris kecamatan tujuan; baris berkas dari
+ * kecamatan lain dilewati.
  *
  * Hanya Admin Kabupaten & Operator PPK (tanpa cakupan desa).
- *
- * Fase 7: impor selalu UNTUK SATU kecamatan tujuan. Mode GANTI hanya
- * menimpa baris kecamatan tujuan itu (dengan cadangan khusus kecamatan
- * itu) — baris kecamatan lain di basis data kabupaten tidak tersentuh.
- * Baris berkas yang kolom KEC-nya berbeda dari tujuan dilewati.
  */
 class Impor extends BaseController
 {
-    private const KOLOM_MHC = [
-        'UID', 'ID', 'NKK', 'NIK', 'NAMA', 'TMPTLHR', 'TGLLHR', 'STATUS',
-        'JENIS_KELAMIN', 'ALAMAT', 'RT', 'RW', 'DISABILITAS', 'EKTP', 'KET',
-        'SUMBER', 'TPS', 'LAST_UPDATE', 'LAT', 'LONG', 'PROV', 'KAB', 'KEC',
-        'DESA', 'TGL_COKLIT',
-    ];
-
     private function wajibImpor()
     {
         $peran = session()->get('pengguna_peran');
         if (! in_array($peran, ['admin', 'operator'], true)
-            || (session()->get('pengguna_desa') !== null && session()->get('pengguna_desa') !== '')
+            || session()->get('pengguna_kelurahan_id') !== null
         ) {
             return redirect()->to('/')->with('galat', 'Impor data hanya untuk Admin PPK / Operator kecamatan.');
         }
@@ -66,8 +61,12 @@ class Impor extends BaseController
         $data = $this->dataHalaman('Impor Data');
         $data['catatan'] = db_connect()->table('impor_log')
             ->orderBy('id', 'DESC')->limit(10)->get()->getResultArray();
-        $data['daftarKecamatan'] = $this->daftarKecamatan();
-        $data['kecTerkunci'] = $this->kecPengguna();
+        $data['daftarKecamatan'] = $this->daftarKecamatanLengkap();
+        $kecIdTerkunci = session()->get('pengguna_kecamatan_id') !== null
+            ? (int) session()->get('pengguna_kecamatan_id') : null;
+        $data['kecTerkunci'] = $kecIdTerkunci;
+        $data['kecTerkunciNama'] = $kecIdTerkunci !== null
+            ? (new WilayahMaster($db = db_connect()))->kecamatan($kecIdTerkunci)['nama'] ?? null : null;
 
         return view('impor/index', $data);
     }
@@ -88,46 +87,59 @@ class Impor extends BaseController
 
         $namaBerkas = $this->request->getFile('berkas')->getClientName();
         $db = db_connect();
+        $master = new WilayahMaster($db);
 
-        // Kecamatan tujuan impor: akun PPK terkunci ke kecamatannya;
-        // Admin memilih dari form (atau menulis nama kecamatan baru
-        // untuk kecamatan yang datanya pertama kali masuk).
-        $target = $this->kecPengguna();
-        if ($target === null) {
-            $target = trim((string) $this->request->getPost('kecamatan_target'));
-            $namaBaru = strtoupper(trim((string) $this->request->getPost('kecamatan_baru')));
+        // Kecamatan tujuan: akun PPK terkunci ke kecamatannya; Admin
+        // memilih kecamatan master dari form, atau menulis nama
+        // kecamatan baru (master dibuat otomatis).
+        $targetId = session()->get('pengguna_kecamatan_id') !== null
+            ? (int) session()->get('pengguna_kecamatan_id') : null;
+        if ($targetId === null) {
+            $namaBaru = WilayahMaster::rapi((string) $this->request->getPost('kecamatan_baru'));
             if ($namaBaru !== '') {
-                $target = $namaBaru;
+                $targetId = $master->kecamatanId(null, $namaBaru);
+            } else {
+                $targetId = (int) $this->request->getPost('kecamatan_target') ?: null;
             }
-            if ($target === '') {
+            if ($targetId === null || $master->kecamatan($targetId) === null) {
                 return redirect()->to('impor')->with('galat', 'Pilih dulu kecamatan tujuan impor.');
             }
         }
+        $targetNama = (string) ($master->kecamatan($targetId)['nama'] ?? '');
 
-        // Petakan kolom dari baris judul
+        // Petakan kolom dari baris judul (dua format dikenali).
         $judul = array_map(static fn ($c) => strtoupper(trim((string) $c)), $baris[0]);
-        $peta = [];
-        foreach (self::KOLOM_MHC as $kolom) {
-            $idx = array_search($kolom, $judul, true);
-            if ($idx !== false) {
-                $peta[$kolom] = $idx;
-            }
+        $format = ImporCoklit::deteksiFormat($judul);
+        if ($format === null) {
+            return redirect()->to('impor')
+                ->with('galat', 'Format berkas tidak dikenal (judul bukan format aplikasi maupun Sidalih).');
         }
-        foreach (['NIK', 'NAMA', 'DESA', 'TPS', 'KET'] as $wajib) {
+        $peta = ImporCoklit::petaKolom($judul, $format);
+        $petaW = ImporCoklit::petaWilayah($judul);
+        foreach (ImporCoklit::KOLOM_WAJIB as $wajib) {
             if (! isset($peta[$wajib])) {
                 return redirect()->to('impor')
                     ->with('galat', 'Kolom wajib "' . $wajib . '" tidak ditemukan di baris judul berkas.');
             }
         }
+        if (! isset($petaW['kel_nama'])) {
+            return redirect()->to('impor')
+                ->with('galat', 'Berkas tidak mempunyai kolom desa/kelurahan (DESA atau KELURAHAN).');
+        }
+
+        $kelurahanTarget = array_map(
+            static fn ($k) => (int) $k['id'],
+            $master->kelurahanDi($targetId)
+        );
 
         // Mode tambah: saring duplikat dengan kunci gabungan
-        // UID+KET+DESA+TPS (App\Libraries\ImporCoklit), BUKAN UID
+        // UID+KET+KELURAHAN+TPS (App\Libraries\ImporCoklit), BUKAN UID
         // saja — satu UID dipakai bersama baris tersaring + baris baru
-        // orang yang sama, jadi saringan UID saja membuang baris sah.
+        // orang yang sama.
         $kunciAda = [];
         if ($mode === 'tambah') {
-            foreach ($db->table('mhc')->select('UID, KET, DESA, TPS')->get()->getResultArray() as $r) {
-                $kunciAda[\App\Libraries\ImporCoklit::kunciBaris($r['UID'], $r['KET'], $r['DESA'], $r['TPS'])] = true;
+            foreach ($db->table('mhc')->select('UID, KET, kelurahan_id, TPS')->get()->getResultArray() as $r) {
+                $kunciAda[ImporCoklit::kunciBaris($r['UID'], $r['KET'], $r['kelurahan_id'], $r['TPS'])] = true;
             }
         }
 
@@ -135,9 +147,9 @@ class Impor extends BaseController
         // baris aktif). Mode ganti: baris aktif kecamatan tujuan sendiri
         // tidak menghalangi karena akan diganti.
         $nikAktifAda = [];
-        $qAktif = $db->table('mhc')->select('NIK')->whereIn('KET', \App\Libraries\Keterangan::MS);
-        if ($mode === 'ganti') {
-            $qAktif->where('KEC !=', $target);
+        $qAktif = $db->table('mhc')->select('NIK')->whereIn('KET', Keterangan::MS);
+        if ($mode === 'ganti' && $kelurahanTarget !== []) {
+            $qAktif->whereNotIn('kelurahan_id', $kelurahanTarget);
         }
         foreach ($qAktif->get()->getResultArray() as $r) {
             $nikAktifAda[(string) $r['NIK']] = true;
@@ -160,36 +172,55 @@ class Impor extends BaseController
                 $v = trim((string) $v);
                 return $v === '' ? null : $v;
             };
+            $ambilW = static function (string $kunci) use ($petaW, $mentah) {
+                if (! isset($petaW[$kunci])) {
+                    return null;
+                }
+                $v = trim((string) ($mentah[$petaW[$kunci]] ?? ''));
+                return $v === '' ? null : $v;
+            };
 
             $nik = (string) $ambil('NIK');
             if (! preg_match('/^\d{16}$/', $nik)) {
                 $gagal[] = 'Baris ' . ($i + 1) . ': NIK "' . $nik . '" tidak sah (harus 16 angka) — dilewati.';
                 continue;
             }
-
-            $uid = $ambil('UID');
-            if ($uid === null) {
-                $uid = strtoupper(bin2hex(random_bytes(8)));
-            }
-
-            $row = [];
-            foreach (self::KOLOM_MHC as $kolom) {
-                $row[$kolom] = $ambil($kolom);
-            }
-            $row['UID'] = $uid;
-            // ID tidak diisi dari berkas: kini AUTO_INCREMENT.
-            unset($row['ID']);
-            $row['TGL_COKLIT'] = $this->normalisasiTanggal($row['TGL_COKLIT']);
-            $row['TGL_LAHIR']  = \App\Libraries\ImporCoklit::tanggalLahirIso($row['TGLLHR'] ?? null);
-
-            $kecBerkas = $row['KEC'] !== null ? strtoupper(trim((string) $row['KEC'])) : '';
-            if ($kecBerkas !== '' && $kecBerkas !== strtoupper($target)) {
-                $gagal[] = 'Baris ' . ($i + 1) . ': KEC "' . $kecBerkas . '" bukan kecamatan tujuan (' . $target . ') — dilewati.';
+            if ($ambil('NAMA') === null || $ambil('TPS') === null) {
+                $gagal[] = 'Baris ' . ($i + 1) . ': NAMA/TPS kosong — dilewati.';
                 continue;
             }
-            $row['KEC'] = $target;
+            $ket = (string) $ambil('KET');
+            if (! array_key_exists($ket, Keterangan::daftar())) {
+                $gagal[] = 'Baris ' . ($i + 1) . ': kode keterangan "' . $ket . '" tidak dikenal — dilewati.';
+                continue;
+            }
 
-            if (\App\Libraries\Keterangan::isMs((string) $row['KET'])) {
+            // Wilayah baris: kecamatan berkas harus sama dengan tujuan.
+            $kecNamaBaris = $ambilW('kec_nama');
+            if ($kecNamaBaris !== null && WilayahMaster::rapi($kecNamaBaris) !== $targetNama) {
+                $gagal[] = 'Baris ' . ($i + 1) . ': kecamatan "' . $kecNamaBaris . '" bukan kecamatan tujuan (' . $targetNama . ') — dilewati.';
+                continue;
+            }
+            $kelNama = $ambilW('kel_nama');
+            if ($kelNama === null) {
+                $gagal[] = 'Baris ' . ($i + 1) . ': desa/kelurahan kosong — dilewati.';
+                continue;
+            }
+            $kelId = $master->kelurahanId($targetId, $ambilW('kel_kode'), $kelNama);
+
+            $row = [];
+            foreach (ImporCoklit::KOLOM_ISI as $kolom) {
+                $row[$kolom] = $ambil($kolom);
+            }
+            $row['UID'] ??= strtoupper(bin2hex(random_bytes(8)));
+            $row['kelurahan_id'] = $kelId;
+            $row['TGL_COKLIT'] = ImporCoklit::normalisasiTanggal($row['TGL_COKLIT']);
+            if ($format === 'sidalih') {
+                $row['LAST_UPDATE'] = ImporCoklit::normalisasiTanggal($row['LAST_UPDATE']);
+            }
+            $row['TGL_LAHIR'] = ImporCoklit::tanggalLahirIso($row['TGLLHR']);
+
+            if (Keterangan::isMs($ket)) {
                 if (isset($nikAktifAda[$nik])) {
                     $gagal[] = 'Baris ' . ($i + 1) . ': NIK ' . $nik . ' sudah mempunyai baris aktif — dialihkan (satu NIK satu baris aktif).';
                     continue;
@@ -197,9 +228,9 @@ class Impor extends BaseController
                 $nikAktifAda[$nik] = true;
             }
             if ($mode === 'tambah') {
-                $kunci = \App\Libraries\ImporCoklit::kunciBaris($row['UID'], $row['KET'], $row['DESA'], $row['TPS']);
+                $kunci = ImporCoklit::kunciBaris($row['UID'], $row['KET'], $row['kelurahan_id'], $row['TPS']);
                 if (isset($kunciAda[$kunci])) {
-                    $gagal[] = 'Baris ' . ($i + 1) . ': baris yang sama (UID+KET+Desa+TPS) sudah ada — dilewati.';
+                    $gagal[] = 'Baris ' . ($i + 1) . ': baris yang sama (UID+KET+Kelurahan+TPS) sudah ada — dilewati.';
                     continue;
                 }
                 $kunciAda[$kunci] = true;
@@ -211,15 +242,15 @@ class Impor extends BaseController
         // Cadangan otomatis sebelum menimpa
         $berkasCadangan = null;
         if ($mode === 'ganti') {
-            $berkasCadangan = $this->cadangkanMhc($target);
+            $berkasCadangan = $this->cadangkanMhc($targetId, $targetNama);
             if ($berkasCadangan === null) {
                 return redirect()->to('impor')->with('galat', 'Gagal membuat cadangan data lama — impor dibatalkan demi keamanan.');
             }
         }
 
         $db->transStart();
-        if ($mode === 'ganti') {
-            $db->table('mhc')->where('KEC', $target)->delete();
+        if ($mode === 'ganti' && $kelurahanTarget !== []) {
+            $db->table('mhc')->whereIn('kelurahan_id', $kelurahanTarget)->delete();
         }
         foreach (array_chunk($siap, 500) as $potong) {
             $db->table('mhc')->insertBatch($potong);
@@ -246,8 +277,8 @@ class Impor extends BaseController
                 'masuk' => count($siap), 'gagal' => count($gagal),
                 'cadangan' => $berkasCadangan,
             ]),
-            'kecamatan'         => $target,
-            'desa'              => null,
+            'kecamatan_id'      => $targetId,
+            'kelurahan_id'      => null,
             'pengguna_id'       => session()->get('pengguna_id'),
             'pengguna_username' => session()->get('pengguna_username'),
             'created_at'        => date('Y-m-d H:i:s'),
@@ -261,11 +292,11 @@ class Impor extends BaseController
         $data = $this->dataHalaman('Hasil Impor Data Coklit');
         $data['ringkasan'] = [
             'jenis' => 'Data Coklit (mhc)', 'mode' => $mode, 'berkas' => $namaBerkas,
-            'kecamatan' => $target,
+            'kecamatan' => $targetNama,
             'terbaca' => $jumlahBarisData, 'masuk' => count($siap), 'gagal' => $gagal,
             'cadangan' => $berkasCadangan,
         ];
-        $data['rekonsiliasi'] = $this->rekonsiliasi($target);
+        $data['rekonsiliasi'] = $this->rekonsiliasi($targetId);
 
         return view('impor/hasil', $data);
     }
@@ -339,7 +370,10 @@ class Impor extends BaseController
             'terbaca' => count($baris) - 1, 'masuk' => $masuk, 'gagal' => $gagal,
             'cadangan' => null,
         ];
-        $data['rekonsiliasi'] = $this->rekonsiliasi($this->kecEfektif());
+        $data['rekonsiliasi'] = $this->rekonsiliasi(
+            session()->get('pengguna_kecamatan_id') !== null
+                ? (int) session()->get('pengguna_kecamatan_id') : null
+        );
 
         return view('impor/hasil', $data);
     }
@@ -399,47 +433,36 @@ class Impor extends BaseController
         return [$baris, null];
     }
 
-    private function normalisasiTanggal($nilai): ?string
-    {
-        if ($nilai === null || $nilai === '') {
-            return null;
-        }
-        if (is_numeric($nilai)) {
-            try {
-                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $nilai)->format('Y-m-d');
-            } catch (\Throwable) {
-                return null;
-            }
-        }
-        $ts = strtotime((string) $nilai);
-
-        return $ts === false ? null : date('Y-m-d', $ts);
-    }
-
-    /** Ekspor mhc (satu kecamatan) ke CSV cadangan. Null bila gagal. */
-    private function cadangkanMhc(?string $kec = null): ?string
+    /** Ekspor mhc satu kecamatan ke CSV cadangan. Null bila gagal. */
+    private function cadangkanMhc(int $kecId, string $kecNama): ?string
     {
         $folder = WRITEPATH . 'backup';
         if (! is_dir($folder)) {
             mkdir($folder, 0775, true);
         }
-        $slug = $kec !== null ? preg_replace('/[^A-Za-z0-9]+/', '-', $kec) . '-' : '';
-        $nama = 'mhc-' . $slug . 'sebelum-impor-' . date('Ymd-His') . '.csv';
+        $slug = preg_replace('/[^A-Za-z0-9]+/', '-', $kecNama);
+        $nama = 'mhc-' . $slug . '-sebelum-impor-' . date('Ymd-His') . '.csv';
         $path = $folder . '/' . $nama;
         $fh = fopen($path, 'w');
         if ($fh === false) {
             return null;
         }
         try {
-            fputcsv($fh, self::KOLOM_MHC);
-            $builderCad = db_connect()->table('mhc')->select(implode(',', self::KOLOM_MHC));
-            if ($kec !== null) {
-                $builderCad->where('KEC', $kec);
-            }
-            $query = $builderCad->get();
+            fputcsv($fh, ImporCoklit::KOLOM_EKSPOR);
+            $query = db_connect()->table('mhc')
+                ->select('kecamatan.kode AS KEC_ID, kecamatan.nama AS KECAMATAN,
+                    kelurahan.kode AS KEL_ID, kelurahan.nama AS KELURAHAN,
+                    mhc.TPS, mhc.UID, mhc.NKK, mhc.NIK, mhc.NAMA, mhc.TMPTLHR,
+                    mhc.TGLLHR, mhc.STATUS, mhc.JENIS_KELAMIN, mhc.ALAMAT, mhc.RT,
+                    mhc.RW, mhc.DISABILITAS, mhc.EKTP, mhc.KET, mhc.SUMBER,
+                    mhc.LAST_UPDATE, mhc.TGL_COKLIT', false)
+                ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+                ->where('kecamatan.id', $kecId)
+                ->get();
             while ($row = $query->getUnbufferedRow('array')) {
                 $urut = [];
-                foreach (self::KOLOM_MHC as $k) {
+                foreach (ImporCoklit::KOLOM_EKSPOR as $k) {
                     $urut[] = $row[$k] ?? null;
                 }
                 fputcsv($fh, $urut);
@@ -454,30 +477,40 @@ class Impor extends BaseController
         return $nama;
     }
 
-    /** Hitungan rekonsiliasi dari view turunan (selalu mutakhir). */
-    private function rekonsiliasi(?string $kec = null): array
+    /** Hitungan rekonsiliasi (dari view turunan + mhc), per kecamatan bila diminta. */
+    private function rekonsiliasi(?int $kecId = null): array
     {
         $db = db_connect();
-        $hitung = static function (string $tabel) use ($db, $kec) {
+        $master = new WilayahMaster($db);
+        $kecNama = $kecId !== null ? ($master->kecamatan($kecId)['nama'] ?? null) : null;
+        $hitungView = static function (string $tabel) use ($db, $kecNama) {
             $b = $db->table($tabel);
-            if ($kec !== null) {
-                $b->where('KEC', $kec);
+            if ($kecNama !== null) {
+                $b->where('KEC', $kecNama);
             }
 
             return (int) $b->countAllResults();
         };
-        $baru = $db->table('mhc')->where('KET', 'B');
-        if ($kec !== null) {
-            $baru->where('KEC', $kec);
-        }
+        $hitungMhc = static function (?string $ket) use ($db, $kecId) {
+            $b = $db->table('mhc');
+            if ($ket !== null) {
+                $b->where('mhc.KET', $ket);
+            }
+            if ($kecId !== null) {
+                $b->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+                  ->where('kelurahan.kecamatan_id', $kecId);
+            }
+
+            return (int) $b->countAllResults();
+        };
 
         return [
-            'Total hasil coklit (mhc)' => $hitung('mhc'),
-            'Pemilih MS / aktif'       => $hitung('ms'),
-            'Pemilih baru'             => (int) $baru->countAllResults(),
-            'Pemilih tersaring (TMS)'  => $hitung('tersaring'),
-            'Pindah TPS (KET 8)'       => $hitung('pindahtps'),
-            'Jumlah KK (dari MS)'      => $hitung('v_nkk'),
+            'Total hasil coklit (mhc)' => $hitungMhc(null),
+            'Pemilih MS / aktif'       => $hitungView('ms'),
+            'Pemilih baru'             => $hitungMhc('B'),
+            'Pemilih tersaring (TMS)'  => $hitungView('tersaring'),
+            'Pindah TPS (KET 8)'       => $hitungView('pindahtps'),
+            'Jumlah KK (dari MS)'      => $hitungView('v_nkk'),
         ];
     }
 }

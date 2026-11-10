@@ -22,15 +22,15 @@
                 <?= csrf_field() ?>
                 <?php if ($kecTerkunci !== null) : ?>
                     <div class="alert alert-info text-sm mb-3">
-                        Kecamatan tujuan terkunci mengikuti akun Anda: <strong><?= esc(ucwords(strtolower($kecTerkunci))) ?></strong>
+                        Kecamatan tujuan terkunci mengikuti akun Anda: <strong><?= esc(ucwords(strtolower((string) $kecTerkunciNama))) ?></strong>
                     </div>
                 <?php else : ?>
                     <label class="form-control mb-3">
                         <span class="label"><span class="label-text font-semibold">KECAMATAN TUJUAN</span></span>
                         <select name="kecamatan_target" class="select select-bordered select-sm w-full">
                             <option value="">— Pilih kecamatan —</option>
-                            <?php foreach ($daftarKecamatan as $namaKec) : ?>
-                                <option value="<?= esc($namaKec, 'attr') ?>"><?= esc(ucwords(strtolower($namaKec))) ?></option>
+                            <?php foreach ($daftarKecamatan as $kec) : ?>
+                                <option value="<?= (int) $kec['id'] ?>"><?= esc(ucwords(strtolower($kec['nama']))) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </label>

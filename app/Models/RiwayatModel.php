@@ -5,11 +5,12 @@ namespace App\Models;
 use CodeIgniter\Model;
 
 /**
- * Fase 2 — Model jejak audit (riwayat_perubahan).
+ * Model jejak audit (riwayat_perubahan).
  *
- * Fase 7: satu basis data kabupaten — catatan memuat kolom wilayah
- * (kecamatan/desa) hasil denormalisasi dari baris yang diubah, agar
- * halaman Riwayat dapat disaring mengikuti wilayah efektif pengguna.
+ * Skema Final 2026: catatan memuat ID wilayah (kecamatan_id /
+ * kelurahan_id) dari baris yang diubah — diselesaikan dari
+ * `kelurahan_id` baris mhc lewat tabel master — agar halaman Riwayat
+ * dapat disaring mengikuti wilayah efektif pengguna.
  */
 class RiwayatModel extends Model
 {
@@ -19,7 +20,7 @@ class RiwayatModel extends Model
     protected $returnType = 'array';
     protected $allowedFields = [
         'tabel', 'kunci_uid', 'nik', 'aksi', 'data_lama', 'data_baru',
-        'kecamatan', 'desa',
+        'kecamatan_id', 'kelurahan_id',
         'pengguna_id', 'pengguna_username', 'created_at',
     ];
     protected $useTimestamps = false;
@@ -28,6 +29,17 @@ class RiwayatModel extends Model
     public function catat(string $aksi, ?array $lama, ?array $baru, string $tabel = 'mhc'): bool
     {
         $acuan = $baru ?? $lama;
+        $kelurahanId = isset($acuan['kelurahan_id']) ? (int) $acuan['kelurahan_id'] : null;
+        $kecamatanId = null;
+        if ($kelurahanId !== null) {
+            try {
+                $kel = $this->db->table('kelurahan')->select('kecamatan_id')
+                    ->where('id', $kelurahanId)->get()->getRowArray();
+                $kecamatanId = $kel !== null ? (int) $kel['kecamatan_id'] : null;
+            } catch (\Throwable) {
+                $kecamatanId = null;
+            }
+        }
 
         return (bool) $this->insert([
             'tabel'             => $tabel,
@@ -36,8 +48,8 @@ class RiwayatModel extends Model
             'aksi'              => $aksi,
             'data_lama'         => $lama !== null ? json_encode($lama) : null,
             'data_baru'         => $baru !== null ? json_encode($baru) : null,
-            'kecamatan'         => $acuan['KEC'] ?? null,
-            'desa'              => $acuan['DESA'] ?? null,
+            'kecamatan_id'      => $kecamatanId,
+            'kelurahan_id'      => $kelurahanId,
             'pengguna_id'       => session()->get('pengguna_id'),
             'pengguna_username' => session()->get('pengguna_username'),
             'created_at'        => date('Y-m-d H:i:s'),

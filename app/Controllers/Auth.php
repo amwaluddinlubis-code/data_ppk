@@ -63,16 +63,38 @@ class Auth extends BaseController
                 ->with('galat', 'Akun ini sudah dinonaktifkan. Hubungi Admin Kabupaten.');
         }
 
+        // Cakupan wilayah akun kini berbasis ID master; nama wilayah
+        // diselesaikan sekali di sini dan disimpan di sesi untuk
+        // tampilan & saringan view (kolom KEC/DESA hasil JOIN).
+        $db = db_connect();
+        $namaKec = null;
+        $namaDesa = null;
+        if (! empty($pengguna['kelurahan_id'])) {
+            $kel = $db->table('kelurahan')->where('id', (int) $pengguna['kelurahan_id'])->get()->getRowArray();
+            if ($kel !== null) {
+                $namaDesa = $kel['nama'];
+            }
+        }
+        if (! empty($pengguna['kecamatan_id'])) {
+            $kecRow = $db->table('kecamatan')->where('id', (int) $pengguna['kecamatan_id'])->get()->getRowArray();
+            if ($kecRow !== null) {
+                $namaKec = $kecRow['nama'];
+            }
+        }
+
         session()->regenerate();
         session()->remove('grup_db');    // sisa Fase 6
         session()->remove('kec_filter'); // saringan wilayah mulai bersih
+        session()->remove('kec_filter_id');
         session()->set([
             'pengguna_id'               => (int) $pengguna['id'],
             'pengguna_nama'             => $pengguna['nama'],
             'pengguna_username'         => $pengguna['username'],
             'pengguna_peran'            => $pengguna['peran'],
-            'pengguna_kecamatan'        => $pengguna['kecamatan'] ?? null,
-            'pengguna_desa'             => $pengguna['desa'],
+            'pengguna_kecamatan_id'     => ! empty($pengguna['kecamatan_id']) ? (int) $pengguna['kecamatan_id'] : null,
+            'pengguna_kelurahan_id'     => ! empty($pengguna['kelurahan_id']) ? (int) $pengguna['kelurahan_id'] : null,
+            'pengguna_kecamatan'        => $namaKec,
+            'pengguna_desa'             => $namaDesa,
             'pengguna_harus_ganti_sandi' => (int) $pengguna['harus_ganti_sandi'],
         ]);
 
@@ -140,22 +162,39 @@ class Auth extends BaseController
         }
 
         $data = $this->dataHalaman('Kelola Pengguna');
-        $data['daftar'] = (new UserModel())->orderBy('peran', 'ASC')->orderBy('nama', 'ASC')->findAll();
-        $data['daftarKecamatan'] = $this->daftarKecamatan();
+        // Perkaya baris pengguna dengan nama wilayah dari master
+        // (tabel users kini hanya menyimpan ID cakupan).
+        $master = new \App\Libraries\WilayahMaster(db_connect());
+        $daftar = (new UserModel())->orderBy('peran', 'ASC')->orderBy('nama', 'ASC')->findAll();
+        foreach ($daftar as &$u) {
+            $u['kecamatan'] = ! empty($u['kecamatan_id'])
+                ? ($master->kecamatan((int) $u['kecamatan_id'])['nama'] ?? null) : null;
+            $u['desa'] = ! empty($u['kelurahan_id'])
+                ? ($master->kelurahan((int) $u['kelurahan_id'])['nama'] ?? null) : null;
+        }
+        unset($u);
+        $data['daftar'] = $daftar;
+        $data['daftarKecamatan'] = $this->daftarKecamatanLengkap();
         $data['daftarDesaSemua'] = $this->daftarDesaSemua();
 
         return view('auth/pengguna', $data);
     }
 
-    /** @return list<string> Semua desa di kabupaten (untuk pilihan PPS). */
+    /** @return list<array{id: int, nama: string, kecamatan_id: int, kecamatan_nama: string}> Semua kelurahan di kabupaten (untuk pilihan PPS). */
     private function daftarDesaSemua(): array
     {
         try {
-            $rows = db_connect()->table('mhc')->select('DESA')->distinct()
-                ->where('DESA IS NOT NULL')->where('DESA !=', '')
-                ->orderBy('DESA', 'ASC')->get()->getResultArray();
+            $rows = db_connect()->table('kelurahan')
+                ->select('kelurahan.id AS id, kelurahan.nama AS nama, kelurahan.kecamatan_id AS kecamatan_id, kecamatan.nama AS kecamatan_nama')
+                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+                ->orderBy('kelurahan.nama', 'ASC')->get()->getResultArray();
 
-            return array_map(static fn ($r) => (string) $r['DESA'], $rows);
+            return array_map(static fn ($r) => [
+                'id'             => (int) $r['id'],
+                'nama'           => (string) $r['nama'],
+                'kecamatan_id'   => (int) $r['kecamatan_id'],
+                'kecamatan_nama' => (string) $r['kecamatan_nama'],
+            ], $rows);
         } catch (\Throwable) {
             return [];
         }
@@ -170,8 +209,8 @@ class Auth extends BaseController
         $nama     = trim((string) $this->request->getPost('nama'));
         $username = trim((string) $this->request->getPost('username'));
         $peran    = (string) $this->request->getPost('peran');
-        $kecamatan = trim((string) $this->request->getPost('kecamatan'));
-        $desa     = trim((string) $this->request->getPost('desa'));
+        $kecId    = (int) $this->request->getPost('kecamatan_id') ?: null;
+        $kelId    = (int) $this->request->getPost('kelurahan_id') ?: null;
         $sandi    = (string) $this->request->getPost('sandi');
 
         $model = new UserModel();
@@ -184,17 +223,22 @@ class Auth extends BaseController
             return redirect()->back()->withInput()->with('galat', 'Peran tidak dikenal.');
         }
 
-        // Fase 7: admin selalu tingkat kabupaten (tanpa cakupan);
-        // peran lain wajib punya cakupan kecamatan, dan PPS wajib desa.
+        // Admin selalu tingkat kabupaten (tanpa cakupan); peran lain
+        // wajib punya cakupan kecamatan, dan desa harus berada di
+        // kecamatan itu (keduanya ID tabel master wilayah).
+        $master = new \App\Libraries\WilayahMaster(db_connect());
         if ($peran === 'admin') {
-            $kecamatan = '';
-            $desa = '';
+            $kecId = null;
+            $kelId = null;
         } else {
-            if ($kecamatan === '' || ! in_array($kecamatan, $this->daftarKecamatan(), true)) {
+            if ($kecId === null || $master->kecamatan($kecId) === null) {
                 return redirect()->back()->withInput()->with('galat', 'Pilih kecamatan cakupan untuk pengguna PPK/PPS.');
             }
-            if ($desa !== '' && ! in_array($desa, $this->daftarDesa($kecamatan), true)) {
-                return redirect()->back()->withInput()->with('galat', 'Desa itu tidak berada di kecamatan terpilih.');
+            if ($kelId !== null) {
+                $kel = $master->kelurahan($kelId);
+                if ($kel === null || (int) $kel['kecamatan_id'] !== $kecId) {
+                    return redirect()->back()->withInput()->with('galat', 'Desa itu tidak berada di kecamatan terpilih.');
+                }
             }
         }
 
@@ -211,8 +255,8 @@ class Auth extends BaseController
             'username'          => $username,
             'password_hash'     => UserModel::hashSandi($sandi),
             'peran'             => $peran,
-            'kecamatan'         => $kecamatan !== '' ? $kecamatan : null,
-            'desa'              => $desa !== '' ? $desa : null,
+            'kecamatan_id'      => $kecId,
+            'kelurahan_id'      => $kelId,
             'aktif'             => 1,
             'harus_ganti_sandi' => 1,
         ]);

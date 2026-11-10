@@ -349,3 +349,39 @@ langsung membentuk struktur akhir — tanpa objek warisan:
   penyesuai 2026-11-10-230000 dalam satu kali `spark migrate` —
   termasuk pengisian `TGL_LAHIR` dari data yang sudah ada dan
   pengarsipan objek warisan menjadi tabel `arsip_*`.
+
+### Skema Final 2026 — Wilayah Ternormalisasi (10 November 2026)
+
+Perintah AMWAL: **database lama dilupakan, MADINA.xlsx menjadi data
+sumber, wilayah dinormalisasi.** Seluruh migration sebelumnya kini
+rintisan kosong; basis data baru dibangun utuh oleh SATU migration
+`2026-11-10-300000_SkemaFinalWilayah`:
+
+- **Tabel master wilayah** — `kecamatan` (kode resmi Sidalih `KEC_ID`,
+  4 digit, + nama) dan `kelurahan` (kode `KEL_ID`, 5 digit, + nama +
+  FK ke kecamatan). Kode boleh kosong untuk wilayah yang lahir dari
+  impor format coklit tanpa kode; kode resmi dilengkapi otomatis
+  begitu impor berkode menyentuhnya.
+- **`mhc` disederhanakan** — kolom `PROV`, `KAB`, `KEC`, `DESA`,
+  `LAT`, `LONG` dibuang. Wilayah cukup disimpan sebagai
+  `kelurahan_id` (FK ke master). Indeks: (kelurahan_id, TPS, KET)
+  dan (KET, kelurahan_id). Aturan satu-NIK-satu-baris-aktif dan
+  kolom `TGL_LAHIR` (DATE) tetap.
+- **Ketujuh view menyajikan kembali kolom `KEC`/`DESA`** (nama hasil
+  JOIN master), sehingga halaman daftar & cetak membaca nama wilayah
+  seperti biasa.
+- **`users` & `riwayat_perubahan`** — cakupan wilayah berbasis ID
+  (`kecamatan_id` / `kelurahan_id`), bukan lagi teks nama.
+- **Tabel `pengaturan`** (kunci-nilai) menyimpan identitas kabupaten
+  (nama provinsi/kabupaten) — diisi oleh opsi `--prov`/`--kab` impor
+  konsol, bukan lagi diulang pada setiap baris pemilih.
+- **Proses impor diperbarui**: wilayah setiap baris diselesaikan ke
+  master oleh `App\Libraries\WilayahMaster` (kode Sidalih didahulukan,
+  nama sebagai cadangan) sebelum baris disimpan; cadangan pra-impor
+  (mode ganti) mengekspor wilayah sebagai KEC_ID/KECAMATAN/KEL_ID/
+  KELURAHAN sehingga dapat diimpor kembali tanpa kehilangan wilayah.
+
+Langkah basis data baru: buat basis data kosong → arahkan `.env` →
+`php spark migrate` → `php spark db:seed PenggunaAwalSeeder` →
+`php spark impor:massal MADINA.xlsx --prov="SUMATERA UTARA" --kab="MANDAILING NATAL"`.
+

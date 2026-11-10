@@ -11,38 +11,57 @@ namespace App\Libraries;
  * Sekarang:
  *
  * - Pemetaan kolom untuk dua format berkas: format aplikasi (judul =
- *   nama kolom mhc) dan format ekspor Sidalih (KECAMATAN, KELURAHAN,
- *   DPID, KETERANGAN, ...).
+ *   nama kolom mhc) dan format ekspor Sidalih (KELURAHAN, DPID,
+ *   KETERANGAN, ...).
+ * - Wilayah TIDAK lagi kolom mhc: berkas membawa KEC_ID/KECAMATAN/
+ *   KEL_ID/KELURAHAN (Sidalih) atau KEC/DESA (aplikasi), yang dipetakan
+ *   terpisah oleh petaWilayah() lalu diselesaikan ke tabel master oleh
+ *   App\Libraries\WilayahMaster menjadi `kelurahan_id`.
  * - Kunci identitas baris untuk mode tambah: gabungan
- *   UID+KET+DESA+TPS. Satu UID pada data coklit dipakai bersama oleh
- *   baris tersaring dan baris baru orang yang sama, jadi UID saja
+ *   UID+KET+KELURAHAN+TPS. Satu UID pada data coklit dipakai bersama
+ *   oleh baris tersaring dan baris baru orang yang sama, jadi UID saja
  *   BUKAN identitas baris.
  * - Normalisasi tanggal berkas Excel/teks.
  */
 final class ImporCoklit
 {
-    /** @var list<string> Semua kolom tabel mhc, urut skema. */
+    /** @var list<string> Semua kolom tabel mhc, urut skema final. */
     public const KOLOM_MHC = [
         'UID', 'ID', 'NKK', 'NIK', 'NAMA', 'TMPTLHR', 'TGLLHR', 'TGL_LAHIR', 'STATUS',
         'JENIS_KELAMIN', 'ALAMAT', 'RT', 'RW', 'DISABILITAS', 'EKTP', 'KET',
-        'SUMBER', 'TPS', 'LAST_UPDATE', 'LAT', 'LONG', 'PROV', 'KAB', 'KEC',
-        'DESA', 'TGL_COKLIT',
+        'SUMBER', 'kelurahan_id', 'TPS', 'LAST_UPDATE', 'TGL_COKLIT',
     ];
 
-    /** @var list<string> Kolom yang wajib ada agar berkas bisa diimpor. */
-    public const KOLOM_WAJIB = ['NIK', 'NAMA', 'DESA', 'TPS', 'KET'];
+    /** @var list<string> Kolom mhc yang diisi langsung dari kolom berkas. */
+    public const KOLOM_ISI = [
+        'UID', 'NKK', 'NIK', 'NAMA', 'TMPTLHR', 'TGLLHR', 'STATUS',
+        'JENIS_KELAMIN', 'ALAMAT', 'RT', 'RW', 'DISABILITAS', 'EKTP', 'KET',
+        'SUMBER', 'TPS', 'LAST_UPDATE', 'TGL_COKLIT',
+    ];
+
+    /** @var list<string> Kolom data yang wajib ada agar berkas bisa diimpor. */
+    public const KOLOM_WAJIB = ['NIK', 'NAMA', 'KET', 'TPS'];
+
+    /**
+     * @var list<string> Judul kolom berkas cadangan/ekspor mhc: wilayah
+     * ditulis sebagai kode + nama master (KEC_ID dst.) agar berkas
+     * cadangan dapat diimpor kembali tanpa kehilangan wilayah.
+     */
+    public const KOLOM_EKSPOR = [
+        'KEC_ID', 'KECAMATAN', 'KEL_ID', 'KELURAHAN', 'TPS', 'UID', 'NKK', 'NIK',
+        'NAMA', 'TMPTLHR', 'TGLLHR', 'STATUS', 'JENIS_KELAMIN', 'ALAMAT', 'RT',
+        'RW', 'DISABILITAS', 'EKTP', 'KET', 'SUMBER', 'LAST_UPDATE', 'TGL_COKLIT',
+    ];
 
     /** @var array<string, string> Judul kolom Sidalih => kolom mhc. */
     private const PETA_SIDALIH = [
-        'KECAMATAN'    => 'KEC',
-        'KELURAHAN'    => 'DESA',
-        'DPID'         => 'UID',
-        'KETERANGAN'   => 'KET',
-        'TEMPAT LAHIR' => 'TMPTLHR',
+        'DPID'          => 'UID',
+        'KETERANGAN'    => 'KET',
+        'TEMPAT LAHIR'  => 'TMPTLHR',
         'TANGGAL LAHIR' => 'TGLLHR',
-        'STS KAWIN'    => 'STATUS',
-        'KELAMIN'      => 'JENIS_KELAMIN',
-        'UPDATED_AT'   => 'LAST_UPDATE',
+        'STS KAWIN'     => 'STATUS',
+        'KELAMIN'       => 'JENIS_KELAMIN',
+        'UPDATED_AT'    => 'LAST_UPDATE',
     ];
 
     /** @var list<string> Kolom Sidalih yang sama nama dengan kolom mhc. */
@@ -59,11 +78,12 @@ final class ImporCoklit
      */
     public static function deteksiFormat(array $judul): ?string
     {
-        if (in_array('KECAMATAN', $judul, true) && in_array('KELURAHAN', $judul, true)
+        if (in_array('KELURAHAN', $judul, true)
             && in_array('DPID', $judul, true) && in_array('KETERANGAN', $judul, true)) {
             return 'sidalih';
         }
-        if (in_array('KEC', $judul, true) && in_array('DESA', $judul, true) && in_array('KET', $judul, true)) {
+        if (in_array('KET', $judul, true)
+            && (in_array('DESA', $judul, true) || in_array('KELURAHAN', $judul, true))) {
             return 'mhc';
         }
 
@@ -73,6 +93,7 @@ final class ImporCoklit
     /**
      * Bangun peta kolom mhc => indeks pada baris berkas, untuk format
      * yang diberikan. Kolom yang tidak ada di berkas tidak masuk peta.
+     * Wilayah tidak termasuk — lihat petaWilayah().
      *
      * @param list<string> $judul
      * @return array<string, int>
@@ -97,7 +118,7 @@ final class ImporCoklit
             return $peta;
         }
 
-        foreach (self::KOLOM_MHC as $kolom) {
+        foreach (self::KOLOM_ISI as $kolom) {
             $idx = array_search($kolom, $judul, true);
             if ($idx !== false) {
                 $peta[$kolom] = $idx;
@@ -107,18 +128,47 @@ final class ImporCoklit
         return $peta;
     }
 
+    /**
+     * Peta kolom wilayah berkas => indeks baris. Kunci yang dikembalikan:
+     * kec_kode (KEC_ID), kec_nama (KECAMATAN atau KEC), kel_kode
+     * (KEL_ID), kel_nama (KELURAHAN atau DESA) — hanya yang ada.
+     *
+     * @param list<string> $judul
+     * @return array<string, int>
+     */
+    public static function petaWilayah(array $judul): array
+    {
+        $calon = [
+            'kec_kode' => ['KEC_ID'],
+            'kec_nama' => ['KECAMATAN', 'KEC'],
+            'kel_kode' => ['KEL_ID'],
+            'kel_nama' => ['KELURAHAN', 'DESA'],
+        ];
+        $peta = [];
+        foreach ($calon as $kunci => $namaKolom) {
+            foreach ($namaKolom as $nama) {
+                $idx = array_search($nama, $judul, true);
+                if ($idx !== false) {
+                    $peta[$kunci] = $idx;
+                    break;
+                }
+            }
+        }
+
+        return $peta;
+    }
+
     /** Kunci identitas satu baris coklit (mode tambah anti-duplikat). */
-    public static function kunciBaris($uid, $ket, $desa, $tps): string
+    public static function kunciBaris($uid, $ket, $kelurahanId, $tps): string
     {
         return implode('|', [
             strtoupper(trim((string) $uid)),
             strtoupper(trim((string) $ket)),
-            strtoupper(trim((string) $desa)),
+            (string) (int) $kelurahanId,
             trim((string) $tps),
         ]);
     }
 
-    /** Normalisasi tanggal Excel (nomor seri) / teks menjadi Y-m-d. */
     /**
      * Ubah teks tanggal lahir (DD|MM|YYYY, DD-MM-YYYY, DD/MM/YYYY,
      * atau ISO) menjadi tanggal ISO untuk kolom DATE TGL_LAHIR.
@@ -149,6 +199,7 @@ final class ImporCoklit
         return null;
     }
 
+    /** Normalisasi tanggal Excel (nomor seri) / teks menjadi Y-m-d. */
     public static function normalisasiTanggal($nilai): ?string
     {
         if ($nilai === null || $nilai === '') {

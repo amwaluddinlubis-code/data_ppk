@@ -30,23 +30,23 @@
                 </label>
                 <label class="form-control w-full">
                     <span class="label-text font-semibold">Kecamatan cakupan (PPK/PPS)</span>
-                    <select name="kecamatan" class="select select-bordered w-full">
+                    <select name="kecamatan_id" id="pilih-kecamatan" class="select select-bordered w-full">
                         <option value="">— Pilih kecamatan —</option>
-                        <?php foreach ($daftarKecamatan as $namaKec) : ?>
-                            <option value="<?= esc($namaKec, 'attr') ?>" <?= old('kecamatan') === $namaKec ? 'selected' : '' ?>><?= esc(ucwords(strtolower($namaKec))) ?></option>
+                        <?php foreach ($daftarKecamatan as $kec) : ?>
+                            <option value="<?= (int) $kec['id'] ?>" <?= (string) old('kecamatan_id') === (string) $kec['id'] ? 'selected' : '' ?>><?= esc(ucwords(strtolower($kec['nama']))) ?></option>
                         <?php endforeach; ?>
                     </select>
                     <span class="label-text-alt">Wajib untuk PPK/PPS. Admin Kabupaten mengabaikan isian ini.</span>
                 </label>
                 <label class="form-control w-full">
                     <span class="label-text font-semibold">Desa (khusus PPS)</span>
-                    <input type="text" name="desa" list="daftar-desa" value="<?= esc(old('desa') ?? '') ?>" class="input input-bordered w-full" placeholder="Kosong = seluruh kecamatan (PPK)">
-                    <datalist id="daftar-desa">
-                        <?php foreach ($daftarDesaSemua as $namaDesa) : ?>
-                            <option value="<?= esc($namaDesa, 'attr') ?>"></option>
+                    <select name="kelurahan_id" id="pilih-desa" class="select select-bordered w-full">
+                        <option value="">— Seluruh kecamatan (PPK) —</option>
+                        <?php foreach ($daftarDesaSemua as $desa) : ?>
+                            <option value="<?= (int) $desa['id'] ?>" data-kec="<?= (int) $desa['kecamatan_id'] ?>" <?= (string) old('kelurahan_id') === (string) $desa['id'] ? 'selected' : '' ?>><?= esc($desa['nama']) ?> — <?= esc(ucwords(strtolower($desa['kecamatan_nama']))) ?></option>
                         <?php endforeach; ?>
-                    </datalist>
-                    <span class="label-text-alt">Isi nama desa bila akun ini untuk PPS desa tersebut.</span>
+                    </select>
+                    <span class="label-text-alt">Pilih desa bila akun ini untuk PPS desa tersebut; daftar menyaring mengikuti kecamatan di atas.</span>
                 </label>
                 <button type="submit" class="btn btn-primary mt-1">Tambah Pengguna</button>
             </form>
@@ -103,5 +103,24 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
-<?php // tidak ada JS khusus ?>
+<script>
+// Saring pilihan desa mengikuti kecamatan cakupan yang dipilih.
+(function () {
+    var kec = document.getElementById('pilih-kecamatan');
+    var desa = document.getElementById('pilih-desa');
+    if (!kec || !desa) return;
+    function saring() {
+        var k = kec.value;
+        Array.prototype.forEach.call(desa.options, function (o) {
+            if (!o.dataset.kec) return;
+            o.hidden = k !== '' && o.dataset.kec !== k;
+        });
+        if (desa.selectedOptions.length && desa.selectedOptions[0].hidden) {
+            desa.value = '';
+        }
+    }
+    kec.addEventListener('change', saring);
+    saring();
+})();
+</script>
 <?= $this->endSection() ?>

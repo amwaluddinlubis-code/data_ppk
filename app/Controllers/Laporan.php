@@ -43,17 +43,20 @@ class Laporan extends BaseController
             [$kecDipilih, $desaDipilih] = explode('::', $pilihan, 2);
         }
 
-        // Agregat per desa dari mhc (satu kueri) + KK dari view v_nkk
+        // Agregat per desa dari mhc (satu kueri, wilayah lewat JOIN
+        // master) + KK dari view v_nkk
         $bDesa = $db->table('mhc')
-            ->select("KEC, DESA,
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select("kecamatan.nama AS KEC, kelurahan.nama AS DESA,
                 COUNT(*) AS total,
-                SUM(KET IN ('0','U','B')) AS ms,
-                SUM(KET = 'B') AS baru,
-                SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
-                SUM(KET = '8') AS pindah,
-                COUNT(DISTINCT TPS) AS jumlah_tps", false);
-        $this->saringWilayah($bDesa);
-        $perDesa = $bDesa->groupBy('KEC, DESA')->orderBy('KEC')->orderBy('DESA')->get()->getResultArray();
+                SUM(mhc.KET IN ('0','U','B')) AS ms,
+                SUM(mhc.KET = 'B') AS baru,
+                SUM(mhc.KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
+                SUM(mhc.KET = '8') AS pindah,
+                COUNT(DISTINCT mhc.TPS) AS jumlah_tps", false);
+        $this->saringWilayahId($bDesa);
+        $perDesa = $bDesa->groupBy('mhc.kelurahan_id')->orderBy('KEC')->orderBy('DESA')->get()->getResultArray();
 
         $bKk = $db->table('v_nkk')->select('KEC, DESA, COUNT(*) AS kk', false);
         $this->saringWilayah($bKk);
@@ -69,6 +72,9 @@ class Laporan extends BaseController
         // Rincian per TPS untuk desa terpilih
         $perTps = [];
         if ($desaDipilih !== '') {
+            $master = new \App\Libraries\WilayahMaster($db);
+            $kelIdDipilih = $kecDipilih !== null && $kecDipilih !== ''
+                ? $master->cariKelurahanId((string) $kecDipilih, $desaDipilih) : null;
             $perTps = $db->table('mhc')
                 ->select("TPS,
                     COUNT(*) AS total,
@@ -76,8 +82,7 @@ class Laporan extends BaseController
                     SUM(KET = 'B') AS baru,
                     SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tersaring,
                     SUM(KET = '8') AS pindah", false)
-                ->where('KEC', $kecDipilih)
-                ->where('DESA', $desaDipilih)
+                ->where('kelurahan_id', $kelIdDipilih ?? -1)
                 ->groupBy('TPS')->orderBy('CAST(TPS AS UNSIGNED)', 'ASC', false)->get()->getResultArray();
 
             $kkPerTps = [];

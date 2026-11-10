@@ -21,7 +21,7 @@ class UserModel extends Model
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $allowedFields    = [
-        'nama', 'username', 'password_hash', 'peran', 'kecamatan', 'desa',
+        'nama', 'username', 'password_hash', 'peran', 'kecamatan_id', 'kelurahan_id',
         'aktif', 'harus_ganti_sandi',
     ];
     protected $useTimestamps = true;

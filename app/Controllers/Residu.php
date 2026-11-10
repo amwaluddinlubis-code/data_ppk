@@ -52,11 +52,13 @@ class Residu extends BaseController
         }
 
         $builder = $db->table('mhc')
-            ->select('NIK, NKK, NAMA, JENIS_KELAMIN, KEC, DESA, TPS, KET, SUMBER')
-            ->orderBy('NIK', 'ASC')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select('mhc.NIK, mhc.NKK, mhc.NAMA, mhc.JENIS_KELAMIN, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET, mhc.SUMBER', false)
+            ->orderBy('mhc.NIK', 'ASC')
             ->orderBy('KEC', 'ASC')
             ->orderBy('DESA', 'ASC')
-            ->orderBy('TPS', 'ASC');
+            ->orderBy('mhc.TPS', 'ASC');
         if ($niks === []) {
             $builder->where('1', '0', false);
         } else {
@@ -87,22 +89,23 @@ class Residu extends BaseController
         $db       = db_connect();
         $bindings = [];
         $sentuh   = '1 = 1';
-        $kec      = $this->kecEfektif();
-        $desa     = $this->desaPengguna();
-        if ($kec !== null && $desa !== null) {
-            $sentuh   = 'm.KEC = ? AND m.DESA = ?';
-            $bindings = [$kec, $desa];
-        } elseif ($kec !== null) {
-            $sentuh   = 'm.KEC = ?';
-            $bindings = [$kec];
+        $kecId    = \App\Libraries\Wilayah::kecEfektifId();
+        $kelId    = \App\Libraries\Wilayah::kelurahanIdPengguna();
+        if ($kecId !== null && $kelId !== null) {
+            $sentuh   = 'm.kelurahan_id = ?';
+            $bindings = [$kelId];
+        } elseif ($kecId !== null) {
+            $sentuh   = 'kel.kecamatan_id = ?';
+            $bindings = [$kecId];
         }
 
         $sql = "SELECT m.NIK AS nik,
-                       CASE WHEN COUNT(DISTINCT m.KEC) > 1 THEN 'kecamatan' ELSE 'desa' END AS kategori
+                       CASE WHEN COUNT(DISTINCT kel.kecamatan_id) > 1 THEN 'kecamatan' ELSE 'desa' END AS kategori
                 FROM mhc m
+                JOIN kelurahan kel ON kel.id = m.kelurahan_id
                 GROUP BY m.NIK
-                HAVING (COUNT(DISTINCT m.KEC) > 1
-                        OR COUNT(DISTINCT CONCAT(m.KEC, '|', m.DESA)) > 1)
+                HAVING (COUNT(DISTINCT kel.kecamatan_id) > 1
+                        OR COUNT(DISTINCT m.kelurahan_id) > 1)
                    AND SUM(CASE WHEN {$sentuh} THEN 1 ELSE 0 END) > 0";
 
         $peta = [];

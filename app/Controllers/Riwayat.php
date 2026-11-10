@@ -34,11 +34,11 @@ class Riwayat extends BaseController
 
         $model = new RiwayatModel();
         $builder = $model->builder();
-        if ($this->kecEfektif() !== null) {
-            $builder->where('kecamatan', $this->kecEfektif());
+        if (\App\Libraries\Wilayah::kecEfektifId() !== null) {
+            $builder->where('kecamatan_id', \App\Libraries\Wilayah::kecEfektifId());
         }
-        if ($this->desaPengguna() !== null) {
-            $builder->where('desa', $this->desaPengguna());
+        if (\App\Libraries\Wilayah::kelurahanIdPengguna() !== null) {
+            $builder->where('kelurahan_id', \App\Libraries\Wilayah::kelurahanIdPengguna());
         }
         if ($aksi !== '') {
             $builder->where('aksi', $aksi);
@@ -46,11 +46,17 @@ class Riwayat extends BaseController
         $total = $builder->countAllResults(false);
         $rows  = $builder->orderBy('id', 'DESC')->get($perHal, ($halaman - 1) * $perHal)->getResultArray();
 
+        // Nama desa tampilan diselesaikan dari master (snapshot baris
+        // kini hanya menyimpan kelurahan_id).
+        $master = new \App\Libraries\WilayahMaster(db_connect());
         foreach ($rows as &$r) {
             $sumber = json_decode((string) ($r['data_baru'] ?? ''), true)
                 ?: json_decode((string) ($r['data_lama'] ?? ''), true) ?: [];
             $r['nama_tampil'] = $sumber['NAMA'] ?? '';
-            $r['desa_tampil'] = $sumber['DESA'] ?? '';
+            $kelId = (int) ($r['kelurahan_id'] ?? ($sumber['kelurahan_id'] ?? 0));
+            $r['desa_tampil'] = $kelId > 0
+                ? ($master->kelurahan($kelId)['nama'] ?? '')
+                : ($sumber['DESA'] ?? '');
         }
         unset($r);
 
@@ -92,7 +98,13 @@ class Riwayat extends BaseController
 
         // ID lama tidak dipakai lagi: kunci pokok dibangkitkan basis
         // data agar tidak bertabrakan dengan baris yang sudah ada.
+        // Saring ke kolom mhc skema final agar salinan lama (bila ada
+        // yang memuat kolom tambahan) tidak menggagalkan penyisipan.
         unset($baris['ID'], $baris['NIK_AKTIF']);
+        $baris = array_intersect_key($baris, array_flip(\App\Libraries\ImporCoklit::KOLOM_MHC));
+        if (empty($baris['kelurahan_id'])) {
+            return redirect()->to('riwayat')->with('galat', 'Salinan baris tidak memuat wilayah (kelurahan) — tidak bisa dipulihkan.');
+        }
         $db->transStart();
         $db->table('mhc')->insert($baris);
         $model->catat('pulih', null, $baris);

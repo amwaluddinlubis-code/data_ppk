@@ -58,12 +58,16 @@ class Coklit extends BaseController
         if ($row === null) {
             return null;
         }
+        // Wilayah baris kini berupa kelurahan_id: nama kecamatan/desa
+        // diselesaikan dari tabel master untuk pemeriksaan cakupan.
+        $master = new \App\Libraries\WilayahMaster($this->db());
+        $kelId = (int) ($row['kelurahan_id'] ?? 0);
         $kecEfektif = $this->kecEfektif();
-        if ($kecEfektif !== null && ($row['KEC'] ?? null) !== $kecEfektif) {
+        if ($kecEfektif !== null && $master->namaKecamatanDariKelurahan($kelId) !== $kecEfektif) {
             return null;
         }
         $cakupan = $this->desaCakupan();
-        if ($cakupan !== null && ($row['DESA'] ?? null) !== $cakupan) {
+        if ($cakupan !== null && ($master->kelurahan($kelId)['nama'] ?? null) !== $cakupan) {
             return null;
         }
 
@@ -92,19 +96,25 @@ class Coklit extends BaseController
         $halaman = max(1, (int) $this->request->getGet('hal'));
         $perHal  = 25;
 
-        $builder = $this->db()->table('mhc');
-        $this->saringKec($builder);
+        $builder = $this->db()->table('mhc')
+            ->select('mhc.*, kelurahan.nama AS DESA, kecamatan.nama AS KEC')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id');
+        $this->saringWilayahId($builder);
         if ($desa !== '') {
-            $builder->where('DESA', $desa);
+            $master = new \App\Libraries\WilayahMaster($this->db());
+            $kecNama = $this->kecEfektif();
+            $kelId = $kecNama !== null ? $master->cariKelurahanId($kecNama, $desa) : null;
+            $builder->where('mhc.kelurahan_id', $kelId ?? -1);
         }
         if ($q !== '') {
             $builder->groupStart()
-                ->like('NIK', $q)->orLike('NAMA', $q)->orLike('NKK', $q)
+                ->like('mhc.NIK', $q)->orLike('mhc.NAMA', $q)->orLike('mhc.NKK', $q)
                 ->groupEnd();
         }
 
         $total = $builder->countAllResults(false);
-        $rows  = $builder->orderBy('DESA', 'ASC')->orderBy('TPS', 'ASC')->orderBy('NAMA', 'ASC')
+        $rows  = $builder->orderBy('DESA', 'ASC')->orderBy('mhc.TPS', 'ASC')->orderBy('mhc.NAMA', 'ASC')
             ->get($perHal, ($halaman - 1) * $perHal)->getResultArray();
 
         $data = $this->dataHalaman('Kelola Data Coklit');
@@ -185,6 +195,12 @@ class Coklit extends BaseController
         if ($baris === null) {
             return redirect()->to('coklit')->with('galat', 'Baris tidak ditemukan (atau di luar desa cakupan Anda).');
         }
+        // Nama wilayah untuk isian form (mhc sendiri hanya menyimpan
+        // kelurahan_id) — kunci tampilan saja, tidak ikut tersimpan.
+        $master = new \App\Libraries\WilayahMaster($this->db());
+        $kelId = (int) ($baris['kelurahan_id'] ?? 0);
+        $baris['DESA'] = $master->kelurahan($kelId)['nama'] ?? '';
+        $baris['KEC']  = $master->namaKecamatanDariKelurahan($kelId) ?? '';
 
         $data = $this->dataHalaman('Ubah Pemilih');
         $data['daftarKecamatan'] = $this->daftarKecamatan();
@@ -326,14 +342,15 @@ class Coklit extends BaseController
 
         $tglCoklit = $ambil('TGL_COKLIT');
 
-        // Baris baru mewarisi PROV/KAB dari data kecamatan tujuan,
-        // supaya tidak ada kolom wilayah yang kosong.
-        $prov = null;
-        $kab  = null;
-        if ($uidSelf === null) {
-            $acuan = $this->db()->table('mhc')->select('PROV, KAB')->where('KEC', $kecTarget)->limit(1)->get()->getRowArray();
-            $prov  = $acuan['PROV'] ?? null;
-            $kab   = $acuan['KAB'] ?? null;
+        // Wilayah disimpan sebagai kelurahan_id (tabel master):
+        // pasangan kecamatan + desa dari form harus sudah terdaftar.
+        $kelurahanId = null;
+        if ($galat === []) {
+            $master = new \App\Libraries\WilayahMaster($this->db());
+            $kelurahanId = $master->cariKelurahanId((string) $kecTarget, $desa);
+            if ($kelurahanId === null) {
+                $galat[] = 'Pasangan kecamatan/desa tidak terdaftar di master wilayah.';
+            }
         }
 
         $bersih = [
@@ -352,15 +369,9 @@ class Coklit extends BaseController
             'KET'           => $ket,
             'SUMBER'        => $ambil('SUMBER'),
             'TPS'           => $tps,
-            'DESA'          => $desa,
-            'KEC'           => $kecTarget,
+            'kelurahan_id'  => $kelurahanId,
             'TGL_COKLIT'    => $tglCoklit !== '' ? $tglCoklit : null,
         ];
-
-        if ($uidSelf === null) {
-            $bersih['PROV'] = $prov;
-            $bersih['KAB']  = $kab;
-        }
 
         return [$galat, $bersih];
     }

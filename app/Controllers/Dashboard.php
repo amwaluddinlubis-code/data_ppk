@@ -25,15 +25,15 @@ class Dashboard extends BaseController
 
         // -- Kartu statistik (mengikuti wilayah efektif) ---------------
         $b = $db->table('mhc');
-        $this->saringWilayah($b);
+        $this->saringWilayahId($b);
         $ringkas = $b->select(
             'COUNT(*) AS total,
              SUM(KET IN (' . Keterangan::sqlMs() . ')) AS ms,
              SUM(KET = \'B\') AS baru,
              SUM(KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
              SUM(KET = \'8\') AS pindah,
-             COUNT(DISTINCT DESA) AS jumlah_desa,
-             COUNT(DISTINCT DESA, TPS) AS jumlah_tps',
+             COUNT(DISTINCT kelurahan_id) AS jumlah_desa,
+             COUNT(DISTINCT kelurahan_id, TPS) AS jumlah_tps',
             false
         )->get()->getRowArray();
 
@@ -53,31 +53,33 @@ class Dashboard extends BaseController
         // Kecamatan aktif → rincian per desa. Seluruh kabupaten →
         // rincian per kecamatan.
         $perKecamatan = $this->kecEfektif() === null;
-        $bW = $db->table('mhc');
-        $this->saringWilayah($bW);
+        $bW = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id');
+        $this->saringWilayahId($bW);
         if ($perKecamatan) {
             $perWilayah = $bW->select(
-                'KEC AS wilayah,
+                'kecamatan.nama AS wilayah,
                  COUNT(*) AS total,
-                 SUM(KET IN (' . Keterangan::sqlMs() . ')) AS ms,
-                 SUM(KET = \'B\') AS baru,
-                 SUM(KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
-                 SUM(KET = \'8\') AS pindah,
-                 COUNT(DISTINCT DESA) AS jumlah_desa,
-                 COUNT(DISTINCT DESA, TPS) AS jumlah_tps',
+                 SUM(mhc.KET IN (' . Keterangan::sqlMs() . ')) AS ms,
+                 SUM(mhc.KET = \'B\') AS baru,
+                 SUM(mhc.KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
+                 SUM(mhc.KET = \'8\') AS pindah,
+                 COUNT(DISTINCT mhc.kelurahan_id) AS jumlah_desa,
+                 COUNT(DISTINCT mhc.kelurahan_id, mhc.TPS) AS jumlah_tps',
                 false
-            )->groupBy('KEC')->orderBy('KEC')->get()->getResultArray();
+            )->groupBy('kecamatan.nama')->orderBy('wilayah')->get()->getResultArray();
         } else {
             $perWilayah = $bW->select(
-                'DESA AS wilayah,
+                'kelurahan.nama AS wilayah,
                  COUNT(*) AS total,
-                 SUM(KET IN (' . Keterangan::sqlMs() . ')) AS ms,
-                 SUM(KET = \'B\') AS baru,
-                 SUM(KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
-                 SUM(KET = \'8\') AS pindah,
-                 COUNT(DISTINCT TPS) AS jumlah_tps',
+                 SUM(mhc.KET IN (' . Keterangan::sqlMs() . ')) AS ms,
+                 SUM(mhc.KET = \'B\') AS baru,
+                 SUM(mhc.KET IN (' . Keterangan::sqlTms() . ')) AS tersaring,
+                 SUM(mhc.KET = \'8\') AS pindah,
+                 COUNT(DISTINCT mhc.TPS) AS jumlah_tps',
                 false
-            )->groupBy('DESA')->orderBy('DESA')->get()->getResultArray();
+            )->groupBy('kelurahan.nama')->orderBy('wilayah')->get()->getResultArray();
         }
 
         $data['title']      = 'Dasbor — Data Pemilih';
@@ -111,26 +113,37 @@ class Dashboard extends BaseController
         $ket  = (string) $this->request->getPost('tms');
         $lp   = $this->request->getPost('lp');
 
-        $builder = $db->table('mhc')->select('DESA, TPS, NKK, NIK, NAMA, TGLLHR, LEFT(LAST_UPDATE,10) AS LU, KET, JENIS_KELAMIN');
-        $this->saringWilayah($builder);
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->select('kelurahan.nama AS DESA, mhc.TPS, mhc.NKK, mhc.NIK, mhc.NAMA, mhc.TGLLHR, LEFT(mhc.LAST_UPDATE,10) AS LU, mhc.KET, mhc.JENIS_KELAMIN', false);
+        $this->saringWilayahId($builder);
         if ($desa != '') {
-            $builder->where('DESA', $desa);
+            // Pilihan desa datang sebagai nama; selesaikan ke master.
+            $kel = $db->table('kelurahan')->select('kelurahan.id AS id')
+                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+                ->where('kelurahan.nama', $desa);
+            $kecId = \App\Libraries\Wilayah::kecEfektifId();
+            if ($kecId !== null) {
+                $kel->where('kelurahan.kecamatan_id', $kecId);
+            }
+            $kelRow = $kel->get()->getRowArray();
+            $builder->where('mhc.kelurahan_id', $kelRow !== null ? (int) $kelRow['id'] : -1);
         }
         if ($tps != '') {
-            $builder->where('TPS', $tps);
+            $builder->where('mhc.TPS', $tps);
         }
         if ($lp != '') {
-            $builder->where('JENIS_KELAMIN', $lp);
+            $builder->where('mhc.JENIS_KELAMIN', $lp);
         }
         if ($ket !== '') {
             if (Keterangan::isMs($ket)) {
-                $builder->where('KET', $ket);
+                $builder->where('mhc.KET', $ket);
             } elseif ($ket === 'TMS') {
                 // Nilai 'TMS' pada pilihan berarti "Pemilih Memenuhi Syarat"
                 // (warisan penamaan aplikasi asal; dipertahankan).
-                $builder->whereIn('KET', Keterangan::MS);
+                $builder->whereIn('mhc.KET', Keterangan::MS);
             } else {
-                $builder->whereIn('KET', Keterangan::TMS);
+                $builder->whereIn('mhc.KET', Keterangan::TMS);
             }
         }
 

@@ -54,9 +54,9 @@ abstract class BaseController extends Controller
         parent::initController($request, $response, $logger);
 
         try {
-            $qKab = db_connect()->table('mhc')->select('KAB')
-                ->where('KAB IS NOT NULL')->where('KAB !=', '')->limit(1)->get()->getRow();
-            $this->kab = $qKab->KAB ?? null;
+            $qKab = db_connect()->table('pengaturan')->select('nilai')
+                ->where('kunci', 'kabupaten')->get()->getRow();
+            $this->kab = $qKab->nilai ?? null;
         } catch (\Throwable) {
             $this->kab = null;
         }
@@ -64,12 +64,14 @@ abstract class BaseController extends Controller
 
         $session        = session();
         $this->pengguna = $session->get('pengguna_id') ? [
-            'id'        => $session->get('pengguna_id'),
-            'nama'      => $session->get('pengguna_nama'),
-            'username'  => $session->get('pengguna_username'),
-            'peran'     => $session->get('pengguna_peran'),
-            'kecamatan' => $session->get('pengguna_kecamatan'),
-            'desa'      => $session->get('pengguna_desa'),
+            'id'           => $session->get('pengguna_id'),
+            'nama'         => $session->get('pengguna_nama'),
+            'username'     => $session->get('pengguna_username'),
+            'peran'        => $session->get('pengguna_peran'),
+            'kecamatan'    => $session->get('pengguna_kecamatan'),
+            'desa'         => $session->get('pengguna_desa'),
+            'kecamatan_id' => $session->get('pengguna_kecamatan_id'),
+            'kelurahan_id' => $session->get('pengguna_kelurahan_id'),
         ] : null;
     }
 
@@ -100,17 +102,35 @@ abstract class BaseController extends Controller
         return Wilayah::saring($builder, $kolomKec, $kolomDesa);
     }
 
-    // -- Daftar wilayah ----------------------------------------------
+    /** Saringan wilayah berdasar ID untuk kueri langsung ke mhc. */
+    protected function saringWilayahId($builder, string $kolomKelurahan = 'mhc.kelurahan_id')
+    {
+        return Wilayah::saringId($builder, $kolomKelurahan);
+    }
 
-    /** @return list<string> Daftar kecamatan yang ada di data coklit. */
+    // -- Daftar wilayah (dari tabel master) ---------------------------
+
+    /** @return list<string> Daftar nama kecamatan pada tabel master. */
     protected function daftarKecamatan(): array
+    {
+        return array_map(
+            static fn ($r) => (string) $r['nama'],
+            $this->daftarKecamatanLengkap()
+        );
+    }
+
+    /** @return list<array{id: int, kode: ?string, nama: string}> Master kecamatan urut nama. */
+    protected function daftarKecamatanLengkap(): array
     {
         if ($this->daftarKecCache === null) {
             try {
-                $rows = db_connect()->table('mhc')->select('KEC')->distinct()
-                    ->where('KEC IS NOT NULL')->where('KEC !=', '')
-                    ->orderBy('KEC', 'ASC')->get()->getResultArray();
-                $this->daftarKecCache = array_map(static fn ($r) => (string) $r['KEC'], $rows);
+                $rows = db_connect()->table('kecamatan')->select('id, kode, nama')
+                    ->orderBy('nama', 'ASC')->get()->getResultArray();
+                $this->daftarKecCache = array_map(static fn ($r) => [
+                    'id'   => (int) $r['id'],
+                    'kode' => $r['kode'],
+                    'nama' => (string) $r['nama'],
+                ], $rows);
             } catch (\Throwable) {
                 $this->daftarKecCache = [];
             }
@@ -120,8 +140,9 @@ abstract class BaseController extends Controller
     }
 
     /**
-     * @return list<string> Daftar desa pada kecamatan efektif (atau
-     * kecamatan yang diberikan). Akun PPS hanya mendapat desanya sendiri.
+     * @return list<string> Daftar nama desa pada kecamatan efektif
+     * (atau kecamatan yang diberikan), dari tabel master kelurahan.
+     * Akun PPS hanya mendapat desanya sendiri.
      */
     protected function daftarDesa(?string $kec = null): array
     {
@@ -131,14 +152,32 @@ abstract class BaseController extends Controller
         }
         $kec = $kec ?? Wilayah::kecEfektif();
         try {
-            $builder = db_connect()->table('mhc')->select('DESA')->distinct()
-                ->where('DESA IS NOT NULL')->where('DESA !=', '');
+            $builder = db_connect()->table('kelurahan')->select('kelurahan.nama AS nama')
+                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id');
             if ($kec !== null) {
-                $builder->where('KEC', $kec);
+                $builder->where('kecamatan.nama', $kec);
             }
-            $rows = $builder->orderBy('DESA', 'ASC')->get()->getResultArray();
+            $rows = $builder->orderBy('kelurahan.nama', 'ASC')->get()->getResultArray();
 
-            return array_map(static fn ($r) => (string) $r['DESA'], $rows);
+            return array_map(static fn ($r) => (string) $r['nama'], $rows);
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /** @return list<array{id: int, kode: ?string, nama: string}> Master kelurahan satu kecamatan. */
+    protected function daftarDesaLengkap(int $kecId): array
+    {
+        try {
+            $rows = db_connect()->table('kelurahan')->select('id, kode, nama')
+                ->where('kecamatan_id', $kecId)
+                ->orderBy('nama', 'ASC')->get()->getResultArray();
+
+            return array_map(static fn ($r) => [
+                'id'   => (int) $r['id'],
+                'kode' => $r['kode'],
+                'nama' => (string) $r['nama'],
+            ], $rows);
         } catch (\Throwable) {
             return [];
         }
