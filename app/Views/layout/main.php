@@ -523,9 +523,13 @@ function muatDaftarTps(desa) {
 // hx-*, dan handler change lama (HTMX/jQuery/inline) tetap bekerja
 // karena pilihan diterapkan ke select lalu peristiwa change dikirim.
 (function () {
+    function teksRingkas(teks) {
+        return (teks || '').replace(/\s+/g, ' ').trim();
+    }
+
     function labelTerpilih(sel) {
         var op = sel.options[sel.selectedIndex];
-        return op ? op.textContent : '';
+        return op ? teksRingkas(op.textContent) : '';
     }
 
     function tingkatkan(sel) {
@@ -571,7 +575,7 @@ function muatDaftarTps(desa) {
             Array.prototype.forEach.call(sel.options, function (op) {
                 var li = document.createElement('li');
                 var a = document.createElement('a');
-                a.textContent = op.textContent;
+                a.textContent = teksRingkas(op.textContent);
                 if (op.value === sel.value) a.classList.add('active');
                 a.addEventListener('mousedown', function (ev) {
                     ev.preventDefault();
