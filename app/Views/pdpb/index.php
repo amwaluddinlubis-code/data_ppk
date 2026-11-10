@@ -82,22 +82,56 @@ $fmt = static fn ($n) => number_format((int) $n, 0, ',', '.');
     </div>
 </div>
 
-<!-- Cetak Model A-PDPB -->
+<!-- Cetak Formulir PDPB (Kelompok 1 — lampiran PKPU 1/2025) -->
 <div class="card bg-base-100 shadow mb-4">
     <div class="card-body p-4">
-        <h3 class="font-bold text-sm mb-2"><i class="fas fa-print text-primary"></i> Cetak Model A-Daftar Pemilih-PDPB</h3>
-        <form method="get" action="<?= base_url('pdpb/cetak') ?>" target="_blank" class="flex flex-wrap items-end gap-2">
-            <label class="form-control">
-                <span class="label"><span class="label-text font-semibold">DESA/KELURAHAN</span></span>
-                <select name="kelurahan_id" class="select select-bordered select-sm w-72" required>
-                    <option value="">— Pilih desa/kelurahan —</option>
-                    <?php foreach ($daftarKelurahan as $dk) : ?>
-                        <option value="<?= (int) $dk['id'] ?>"><?= esc($dk['kecamatan']) ?> — <?= esc($dk['nama']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </label>
-            <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-print"></i> CETAK</button>
-        </form>
+        <h3 class="font-bold text-sm mb-2"><i class="fas fa-print text-primary"></i> Cetak Formulir PDPB</h3>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <form method="get" target="_blank" class="flex flex-wrap items-end gap-2">
+                <label class="form-control">
+                    <span class="label"><span class="label-text font-semibold">PERIODE</span></span>
+                    <select name="periode_id" class="select select-bordered select-sm w-64">
+                        <?php foreach ($daftarPeriode as $dp) : ?>
+                            <option value="<?= (int) $dp['id'] ?>"><?= esc($dp['nama']) ?><?= $dp['status'] === 'ditutup' ? ' (arsip)' : '' ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label class="form-control">
+                    <span class="label"><span class="label-text font-semibold">DESA/KELURAHAN (UNTUK D1, D2, D6)</span></span>
+                    <select name="kelurahan_id" class="select select-bordered select-sm w-64">
+                        <option value="">— Pilih desa/kelurahan —</option>
+                        <?php foreach ($daftarKelurahan as $dk) : ?>
+                            <option value="<?= (int) $dk['id'] ?>"><?= esc($dk['kecamatan']) ?> — <?= esc($dk['nama']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <div class="flex flex-wrap gap-2 w-full mt-1">
+                    <button type="submit" formaction="<?= base_url('pdpb/cetak') ?>" class="btn btn-outline btn-sm">D1 · Daftar Pemilih-PDPB</button>
+                    <button type="submit" formaction="<?= base_url('pdpb/cetak-perubahan') ?>" class="btn btn-outline btn-sm">D2 · Daftar Perubahan</button>
+                    <button type="submit" formaction="<?= base_url('pdpb/cetak-rekap-perubahan') ?>" class="btn btn-outline btn-sm">D4 · Rekap Perubahan Kabko</button>
+                    <button type="submit" formaction="<?= base_url('pdpb/cetak-rekap') ?>" class="btn btn-outline btn-sm">D3 · Rekap Kabko-PDPB</button>
+                    <button type="submit" formaction="<?= base_url('pdpb/cetak-tanggapan') ?>" class="btn btn-outline btn-sm">D6 · Tanggapan Masyarakat</button>
+                </div>
+                <p class="text-xs opacity-60">D1/D2/D6 memerlukan pilihan desa; D3/D4 mengikuti cakupan wilayah Anda. Periode arsip mencetak angka beku saat pleno.</p>
+            </form>
+            <?php if ($adalahAdmin) : ?>
+                <div class="border border-base-300 rounded-box p-3">
+                    <div class="font-semibold text-sm mb-1"><i class="fas fa-file-signature text-primary"></i> D5 · Berita Acara Rekapitulasi PDPB</div>
+                    <p class="text-xs opacity-70 mb-2">Isi metadata pleno (nomor BA, tanggal, tempat, masukan, nama ketua/anggota) lalu cetak Berita Acara Lampiran VII. Metadata tersimpan pada periode agar cetakan ulang identik.</p>
+                    <form method="get" action="<?= base_url('pdpb/ba') ?>" class="flex items-end gap-2">
+                        <label class="form-control">
+                            <span class="label"><span class="label-text font-semibold">PERIODE</span></span>
+                            <select name="periode_id" class="select select-bordered select-sm w-64">
+                                <?php foreach ($daftarPeriode as $dp) : ?>
+                                    <option value="<?= (int) $dp['id'] ?>"><?= esc($dp['nama']) ?><?= $dp['status'] === 'ditutup' ? ' (arsip)' : '' ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </label>
+                        <button type="submit" class="btn btn-primary btn-sm">BUKA BERITA ACARA</button>
+                    </form>
+                </div>
+            <?php endif; ?>
+        </div>
     </div>
 </div>
 

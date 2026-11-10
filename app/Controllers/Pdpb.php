@@ -113,6 +113,7 @@ class Pdpb extends BaseController
             'arsip'    => $arsipRingkasan,
             'detailArsip' => $detailArsip,
             'daftarKelurahan' => $daftarKelurahan->get()->getResultArray(),
+            'daftarPeriode' => $db->table('periode')->where('jenis', 'pdpb')->orderBy('id', 'DESC')->get()->getResultArray(),
             'konteksNama' => Konteks::nama(),
             'adalahAdmin' => session()->get('pengguna_peran') === 'admin',
         ]);
@@ -234,6 +235,299 @@ class Pdpb extends BaseController
             'kel' => $kel, 'baris' => $baris,
             'provinsi' => $peta['provinsi'] ?? '', 'kabupaten' => $peta['kabupaten'] ?? '',
             'periode' => PeriodePdpb::pastikanAktif(),
+        ]);
+    }
+
+    // -- Cetak Kelompok 1 (lampiran PKPU 1/2025) ----------------------
+
+    /** Periode dari parameter (0/kosong = berjalan) — objek kabupaten, isi yang tercakup. */
+    private function ambilPeriode(int $id): ?array
+    {
+        $db = $this->db();
+        if ($id > 0) {
+            return $db->table('periode')->where('id', $id)->where('jenis', 'pdpb')->get()->getRowArray();
+        }
+
+        return PeriodePdpb::pastikanAktif();
+    }
+
+    /** @return array<string, string> */
+    private function pengaturanPeta(): array
+    {
+        $peta = [];
+        foreach ($this->db()->table('pengaturan')->get()->getResultArray() as $p) {
+            $peta[$p['kunci']] = $p['nilai'];
+        }
+
+        return $peta;
+    }
+
+    /** D2 — Model A-Daftar Perubahan Pemilih-PDPB (Lampiran III), per desa per periode. */
+    public function cetakPerubahan()
+    {
+        $db = $this->db();
+        $periode = $this->ambilPeriode((int) ($this->request->getGet('periode_id') ?? 0));
+        $kelId = (int) ($this->request->getGet('kelurahan_id') ?? 0);
+        $kelPengguna = Wilayah::kelurahanIdPengguna();
+        $kecEfektif = Wilayah::kecEfektifId();
+        if ($periode === null || ($kelPengguna !== null && $kelId !== $kelPengguna)) {
+            return redirect()->to('pdpb')->with('galat', 'Di luar cakupan wilayah Anda.');
+        }
+        $kel = $db->table('kelurahan')->select('kelurahan.*, kecamatan.nama AS kecamatan')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->where('kelurahan.id', $kelId)->get()->getRowArray();
+        if ($kel === null || ($kecEfektif !== null && (int) $kel['kecamatan_id'] !== $kecEfektif)) {
+            return redirect()->to('pdpb')->with('galat', 'Desa/kelurahan tidak ditemukan dalam cakupan.');
+        }
+
+        $rows = $db->table('riwayat_perubahan')
+            ->where('periode_id', (int) $periode['id'])->where('tabel', 'mhc')
+            ->where('kelurahan_id', $kelId)
+            ->orderBy('created_at')->get()->getResultArray();
+        $baris = [];
+        foreach ($rows as $r) {
+            $baru = $r['data_baru'] !== null ? (json_decode((string) $r['data_baru'], true) ?? []) : [];
+            $lama = $r['data_lama'] !== null ? (json_decode((string) $r['data_lama'], true) ?? []) : [];
+            $tampil = $baru !== [] ? $baru : $lama;
+            if ($tampil === []) {
+                continue;
+            }
+            $ket = match ($r['aksi']) {
+                'tambah' => 'B',
+                'hapus'  => 'Dihapus',
+                'pulih'  => 'U',
+                default  => (string) ($baru['KET'] ?? ''),
+            };
+            $baris[] = ['data' => $tampil, 'ket' => $ket, 'dokumen' => $r['dokumen_jenis']];
+        }
+        usort($baris, static fn ($a, $b) => [(int) ($a['data']['TPS'] ?? 0), (string) ($a['data']['NAMA'] ?? '')] <=> [(int) ($b['data']['TPS'] ?? 0), (string) ($b['data']['NAMA'] ?? '')]);
+
+        $peta = $this->pengaturanPeta();
+
+        return view('pdpb/cetak_perubahan', [
+            'title' => 'Model A-Daftar Perubahan Pemilih-PDPB — ' . $kel['nama'],
+            'kel' => $kel, 'baris' => $baris, 'periode' => $periode,
+            'provinsi' => $peta['provinsi'] ?? '', 'kabupaten' => $peta['kabupaten'] ?? '',
+        ]);
+    }
+
+    /** D4 — Model A-Rekap Perubahan Pemilih Kabko (Lampiran VI), per periode. */
+    public function cetakRekapPerubahan()
+    {
+        $periode = $this->ambilPeriode((int) ($this->request->getGet('periode_id') ?? 0));
+        if ($periode === null) {
+            return redirect()->to('pdpb')->with('galat', 'Periode tidak ditemukan.');
+        }
+        $kecId = Wilayah::kecEfektifId();
+        $kelId = Wilayah::kelurahanIdPengguna();
+        $rekap = $this->hitungRekap((int) $periode['id'], $kecId, $kelId);
+
+        $perDesa = [];
+        foreach ($rekap['perKel'] as $kelurahanId => $r) {
+            $perDesa[] = [
+                'kecamatan' => $r['kecamatan'], 'desa' => $r['nama'],
+                'baru' => $r['baru'], 'tms' => $r['tms'] + $r['hapus'],
+                'perbaikan' => $r['ubah'] + $r['pulih'],
+            ];
+        }
+        usort($perDesa, static fn ($a, $b) => [$a['kecamatan'], $a['desa']] <=> [$b['kecamatan'], $b['desa']]);
+        $total = $rekap['total'];
+        $peta = $this->pengaturanPeta();
+
+        return view('pdpb/cetak_rekap_perubahan', [
+            'title' => 'Model A-Rekap Perubahan Pemilih — ' . $periode['nama'],
+            'periode' => $periode, 'perDesa' => $perDesa,
+            'total' => ['baru' => $total['baru'], 'tms' => $total['tms'] + $total['hapus'], 'perbaikan' => $total['ubah'] + $total['pulih']],
+            'provinsi' => $peta['provinsi'] ?? '', 'kabupaten' => $peta['kabupaten'] ?? '',
+        ]);
+    }
+
+    /** D3 — Model A-Rekap Kabko-PDPB (Lampiran V): jumlah pemilih per kecamatan. */
+    public function cetakRekap()
+    {
+        $db = $this->db();
+        $periode = $this->ambilPeriode((int) ($this->request->getGet('periode_id') ?? 0));
+        if ($periode === null) {
+            return redirect()->to('pdpb')->with('galat', 'Periode tidak ditemukan.');
+        }
+        $kecId = Wilayah::kecEfektifId();
+        $kelId = Wilayah::kelurahanIdPengguna();
+
+        $perKec = [];
+        if ($periode['status'] === 'ditutup') {
+            $q = $db->table('arsip_rekap')->select('arsip_rekap.metrik, kecamatan.nama AS kec_nama')
+                ->join('kecamatan', 'kecamatan.id = arsip_rekap.kecamatan_id')
+                ->where('arsip_rekap.periode_id', (int) $periode['id'])->where('arsip_rekap.tingkat', 'kecamatan');
+            if ($kelId !== null) {
+                $q->where('arsip_rekap.kecamatan_id', $db->table('kelurahan')->select('kecamatan_id')->where('id', $kelId)->get()->getRowArray()['kecamatan_id'] ?? 0);
+            } elseif ($kecId !== null) {
+                $q->where('arsip_rekap.kecamatan_id', $kecId);
+            }
+            foreach ($q->orderBy('kecamatan.nama')->get()->getResultArray() as $r) {
+                $m = json_decode((string) $r['metrik'], true) ?? [];
+                $perKec[] = ['kecamatan' => $r['kec_nama'], 'desa' => null,
+                    'laki' => (int) ($m['laki'] ?? 0), 'perempuan' => (int) ($m['perempuan'] ?? 0), 'total' => (int) ($m['ms'] ?? 0)];
+            }
+            // Jumlah desa per kecamatan dari master (tetap).
+            $jumlahDesa = [];
+            foreach ($db->table('kelurahan')->select('kecamatan_id, COUNT(*) AS c', false)->groupBy('kecamatan_id')->get()->getResultArray() as $r) {
+                $jumlahDesa[(int) $r['kecamatan_id']] = (int) $r['c'];
+            }
+            $namaKeId = [];
+            foreach ($db->table('kecamatan')->get()->getResultArray() as $k) {
+                $namaKeId[$k['nama']] = (int) $k['id'];
+            }
+            foreach ($perKec as &$barisKec) {
+                $barisKec['desa'] = $jumlahDesa[$namaKeId[$barisKec['kecamatan']] ?? 0] ?? 0;
+            }
+            unset($barisKec);
+        } else {
+            $hidup = $this->hitungHidup($kecId, $kelId);
+            $desaPerKec = [];
+            foreach ($hidup as $h) {
+                $nama = $h['kecamatan'];
+                $perKec[$nama] ??= ['kecamatan' => $nama, 'desa' => 0, 'laki' => 0, 'perempuan' => 0, 'total' => 0];
+                $perKec[$nama]['desa']++;
+                $perKec[$nama]['laki'] += $h['laki'];
+                $perKec[$nama]['perempuan'] += $h['perempuan'];
+                $perKec[$nama]['total'] += $h['ms'];
+            }
+            $perKec = array_values($perKec);
+            usort($perKec, static fn ($a, $b) => $a['kecamatan'] <=> $b['kecamatan']);
+        }
+
+        $total = ['desa' => 0, 'laki' => 0, 'perempuan' => 0, 'total' => 0];
+        foreach ($perKec as $r) {
+            $total['desa'] += (int) $r['desa'];
+            $total['laki'] += $r['laki'];
+            $total['perempuan'] += $r['perempuan'];
+            $total['total'] += $r['total'];
+        }
+        $peta = $this->pengaturanPeta();
+
+        return view('pdpb/cetak_rekap', [
+            'title' => 'Model A-Rekap Kabko-PDPB — ' . $periode['nama'],
+            'periode' => $periode, 'perKec' => $perKec, 'total' => $total,
+            'provinsi' => $peta['provinsi'] ?? '', 'kabupaten' => $peta['kabupaten'] ?? '',
+        ]);
+    }
+
+    /** D5 — formulir metadata Berita Acara (admin) + pintu cetak. */
+    public function ba()
+    {
+        if (session()->get('pengguna_peran') !== 'admin') {
+            return redirect()->to('pdpb')->with('galat', 'Berita Acara kabupaten hanya untuk admin.');
+        }
+        $periode = $this->ambilPeriode((int) ($this->request->getGet('periode_id') ?? 0));
+        if ($periode === null) {
+            return redirect()->to('pdpb')->with('galat', 'Periode tidak ditemukan.');
+        }
+        $daftarPeriode = $this->db()->table('periode')->where('jenis', 'pdpb')->orderBy('id', 'DESC')->get()->getResultArray();
+
+        return view('pdpb/ba', [
+            'title' => 'Berita Acara PDPB', 'title_page' => 'Berita Acara Rekapitulasi PDPB',
+            'periode' => $periode, 'daftarPeriode' => $daftarPeriode,
+        ]);
+    }
+
+    /** Simpan metadata Berita Acara pada periode (admin). */
+    public function baSimpan()
+    {
+        if (session()->get('pengguna_peran') !== 'admin') {
+            return redirect()->to('pdpb')->with('galat', 'Hanya admin kabupaten.');
+        }
+        $id = (int) $this->request->getPost('periode_id');
+        $tgl = trim((string) $this->request->getPost('ba_tanggal'));
+        if ($tgl !== '') {
+            $cek = \DateTimeImmutable::createFromFormat('Y-m-d', $tgl);
+            if (! $cek || $cek->format('Y-m-d') !== $tgl) {
+                return redirect()->to('pdpb/ba?periode_id=' . $id)->with('galat', 'Tanggal pleno tidak sah.');
+            }
+        }
+        $potong = static fn ($v, $n) => mb_substr(trim((string) $v), 0, $n);
+        $this->db()->table('periode')->where('id', $id)->update([
+            'ba_nomor'   => $potong($this->request->getPost('ba_nomor'), 80) ?: null,
+            'ba_tanggal' => $tgl !== '' ? $tgl : null,
+            'ba_tempat'  => $potong($this->request->getPost('ba_tempat'), 120) ?: null,
+            'ba_pukul'   => $potong($this->request->getPost('ba_pukul'), 5) ?: null,
+            'ba_masukan' => $potong($this->request->getPost('ba_masukan'), 2000) ?: null,
+            'ba_ketua'   => $potong($this->request->getPost('ba_ketua'), 120) ?: null,
+            'ba_anggota' => $potong($this->request->getPost('ba_anggota'), 2000) ?: null,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return redirect()->to('pdpb/ba?periode_id=' . $id)->with('sukses', 'Metadata Berita Acara tersimpan.');
+    }
+
+    /** D5 — cetak Berita Acara Rekapitulasi PDPB (Lampiran VII). Admin. */
+    public function baCetak()
+    {
+        if (session()->get('pengguna_peran') !== 'admin') {
+            return redirect()->to('pdpb')->with('galat', 'Berita Acara kabupaten hanya untuk admin.');
+        }
+        $db = $this->db();
+        $periode = $this->ambilPeriode((int) ($this->request->getGet('periode_id') ?? 0));
+        if ($periode === null) {
+            return redirect()->to('pdpb')->with('galat', 'Periode tidak ditemukan.');
+        }
+
+        if ($periode['status'] === 'ditutup') {
+            $kab = $db->table('arsip_rekap')->where('periode_id', (int) $periode['id'])
+                ->where('tingkat', 'kabupaten')->get()->getRowArray();
+            $m = $kab !== null ? (json_decode((string) $kab['metrik'], true) ?? []) : [];
+            $angka = ['laki' => (int) ($m['laki'] ?? 0), 'perempuan' => (int) ($m['perempuan'] ?? 0), 'total' => (int) ($m['ms'] ?? 0)];
+            $jmlKec = (int) $db->table('arsip_rekap')->where('periode_id', (int) $periode['id'])->where('tingkat', 'kecamatan')->countAllResults();
+            $jmlDesa = (int) $db->table('arsip_rekap')->where('periode_id', (int) $periode['id'])->where('tingkat', 'kelurahan')->countAllResults();
+        } else {
+            $hidup = $this->hitungHidup(null, null);
+            $angka = ['laki' => 0, 'perempuan' => 0, 'total' => 0];
+            $kecSet = [];
+            foreach ($hidup as $h) {
+                $angka['laki'] += $h['laki'];
+                $angka['perempuan'] += $h['perempuan'];
+                $angka['total'] += $h['ms'];
+                $kecSet[$h['kecamatan_id']] = true;
+            }
+            $jmlKec = count($kecSet);
+            $jmlDesa = count($hidup);
+        }
+
+        $peta = $this->pengaturanPeta();
+
+        return view('pdpb/ba_cetak', [
+            'title' => 'Berita Acara Rekapitulasi PDPB — ' . $periode['nama'],
+            'periode' => $periode, 'angka' => $angka,
+            'jmlKec' => $jmlKec, 'jmlDesa' => $jmlDesa,
+            'provinsi' => $peta['provinsi'] ?? '', 'kabupaten' => $peta['kabupaten'] ?? '',
+        ]);
+    }
+
+    /** D6 — Model A-Tanggapan Masyarakat-PDPB (Lampiran VIII): formulir register tanggapan. */
+    public function cetakTanggapan()
+    {
+        $db = $this->db();
+        $kelId = (int) ($this->request->getGet('kelurahan_id') ?? 0);
+        $kel = null;
+        if ($kelId > 0) {
+            $kelPengguna = Wilayah::kelurahanIdPengguna();
+            $kecEfektif = Wilayah::kecEfektifId();
+            if ($kelPengguna !== null && $kelId !== $kelPengguna) {
+                return redirect()->to('pdpb')->with('galat', 'Di luar cakupan wilayah Anda.');
+            }
+            $kel = $db->table('kelurahan')->select('kelurahan.*, kecamatan.nama AS kecamatan')
+                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+                ->where('kelurahan.id', $kelId)->get()->getRowArray();
+            if ($kel === null || ($kecEfektif !== null && (int) $kel['kecamatan_id'] !== $kecEfektif)) {
+                return redirect()->to('pdpb')->with('galat', 'Desa/kelurahan tidak ditemukan dalam cakupan.');
+            }
+        }
+        $periode = $this->ambilPeriode((int) ($this->request->getGet('periode_id') ?? 0));
+        $peta = $this->pengaturanPeta();
+
+        return view('pdpb/cetak_tanggapan', [
+            'title' => 'Model A-Tanggapan Masyarakat-PDPB',
+            'kel' => $kel, 'periode' => $periode,
+            'provinsi' => $peta['provinsi'] ?? '', 'kabupaten' => $peta['kabupaten'] ?? '',
         ]);
     }
 

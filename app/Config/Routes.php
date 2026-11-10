@@ -115,4 +115,13 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('pdpb/cetak', 'Pdpb::cetak');
     $routes->post('pdpb/tutup', 'Pdpb::tutup');
     $routes->post('pdpb/nama', 'Pdpb::gantiNama');
+
+    // Cetak formulir PDPB Kelompok 1 (lampiran PKPU 1/2025)
+    $routes->get('pdpb/cetak-perubahan', 'Pdpb::cetakPerubahan');
+    $routes->get('pdpb/cetak-rekap-perubahan', 'Pdpb::cetakRekapPerubahan');
+    $routes->get('pdpb/cetak-rekap', 'Pdpb::cetakRekap');
+    $routes->get('pdpb/cetak-tanggapan', 'Pdpb::cetakTanggapan');
+    $routes->get('pdpb/ba', 'Pdpb::ba');
+    $routes->post('pdpb/ba/simpan', 'Pdpb::baSimpan');
+    $routes->get('pdpb/ba/cetak', 'Pdpb::baCetak');
 });
