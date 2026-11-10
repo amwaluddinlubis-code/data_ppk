@@ -64,12 +64,18 @@ $kartu = [
     </div>
 
     <!-- Rincian per wilayah -->
-    <div class="card bg-base-100 shadow xl:col-span-2">
+    <div class="card bg-base-100 shadow xl:col-span-2" x-data="{ terbuka: true }">
         <div class="card-body p-4">
-            <div class="font-semibold text-sm mb-2">
-                Rincian per <?= $perKecamatan ? 'Kecamatan' : 'Desa' ?>
+            <div class="flex items-center justify-between mb-2">
+                <div class="font-semibold text-sm">
+                    Rincian per <?= $perKecamatan ? 'Kecamatan' : 'Desa' ?>
+                </div>
+                <button type="button" class="btn btn-ghost btn-xs" @click="terbuka = !terbuka">
+                    <i class="fas" :class="terbuka ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                    <span x-text="terbuka ? 'Sembunyikan' : 'Tampilkan'"></span>
+                </button>
             </div>
-            <div class="overflow-x-auto max-h-80 overflow-y-auto">
+            <div class="overflow-x-auto max-h-80 overflow-y-auto" x-show="terbuka" x-cloak>
                 <table class="table table-sm table-zebra w-full">
                     <thead>
                         <tr>
@@ -107,14 +113,22 @@ $kartu = [
     </div>
 </div>
 
-<!-- Hasil Coklit Pantarlih -->
-<div class="card bg-base-100 shadow">
+<!-- Hasil Coklit Pantarlih (pilot HTMX + Alpine) -->
+<div class="card bg-base-100 shadow" x-data="{ memuat: false }"
+     @htmx:before-request="memuat = true" @htmx:after-request="memuat = false">
     <div class="card-body p-4">
-        <div class="font-semibold text-sm mb-1">Hasil Coklit Pantarlih</div>
+        <div class="flex items-center gap-2 mb-1">
+            <div class="font-semibold text-sm">Hasil Coklit Pantarlih</div>
+            <span class="badge badge-info badge-sm" x-show="memuat" x-cloak>
+                <span class="loading loading-spinner loading-xs"></span> Memuat…
+            </span>
+        </div>
         <div class="flex flex-wrap items-end gap-3 mb-4">
             <label class="form-control w-full sm:w-60">
                 <span class="label"><span class="label-text font-semibold">DESA</span></span>
-                <select class="select select-bordered select-sm" id="DESA" name="desa">
+                <select class="select select-bordered select-sm" id="DESA" name="desa"
+                        hx-get="<?= base_url('filter/tps-opsi') ?>" hx-target="#TPS" hx-swap="innerHTML"
+                        hx-vals='{"sumber":"semua"}'>
                     <option value="">PILIH DESA</option>
                     <?php foreach ($arrDesa as $d) : ?>
                         <option value="<?= esc($d, 'attr') ?>"><?= esc($d) ?></option>
@@ -123,13 +137,16 @@ $kartu = [
             </label>
             <label class="form-control w-full sm:w-36">
                 <span class="label"><span class="label-text font-semibold">TPS</span></span>
-                <select class="select select-bordered select-sm" id="TPS" data-sumber="semua">
+                <select class="select select-bordered select-sm" id="TPS" name="tps">
                     <option value="">PILIH TPS</option>
+                    <?php foreach ($tpsAwal as $nomor) : ?>
+                        <option value="<?= esc($nomor, 'attr') ?>">TPS <?= esc($nomor) ?></option>
+                    <?php endforeach; ?>
                 </select>
             </label>
             <label class="form-control w-full sm:w-60">
                 <span class="label"><span class="label-text font-semibold">KATEGORI</span></span>
-                <select class="select select-bordered select-sm" id="KET">
+                <select class="select select-bordered select-sm" id="KET" name="tms">
                     <option value="">PILIH KATEGORI</option>
                     <option value="0">0 — PEMILIH SESUAI</option>
                     <option value="U">U — PEMILIH UBAH</option>
@@ -147,7 +164,10 @@ $kartu = [
                 </select>
             </label>
             <div class="flex gap-2">
-                <button type="button" class="btn btn-primary btn-sm" onclick="loadData()">
+                <button type="button" class="btn btn-primary btn-sm"
+                        hx-get="<?= base_url('dashboard/tabelPemilih') ?>"
+                        hx-target="#wadah-hasil-coklit" hx-swap="innerHTML"
+                        hx-include="[name='desa'],[name='tps'],[name='tms'],[name='lp']">
                     <i class="fas fa-filter"></i> FILTER
                 </button>
                 <a href="<?= base_url() ?>" class="btn btn-error btn-sm">
@@ -156,65 +176,16 @@ $kartu = [
             </div>
         </div>
 
-        <div class="overflow-x-auto">
-            <table id="MHC" class="table table-zebra table-sm w-full">
-                <thead>
-                    <tr>
-                        <th>NO</th>
-                        <th>DESA</th>
-                        <th>TPS</th>
-                        <th>NKK</th>
-                        <th>NIK</th>
-                        <th>NAMA</th>
-                        <th>TGL LAHIR</th>
-                        <th>LAST UPDATE</th>
-                        <th>KET</th>
-                        <th>L/P</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <div id="wadah-hasil-coklit">
+            <?= view('dashboard/_tabel_pemilih', $tabelAwal) ?>
         </div>
-        <p class="text-xs opacity-60 mt-2">Baris berwarna merah muda = keterangan (KET) berupa kode angka (tersaring/bermasalah).</p>
+        <p class="text-xs opacity-60 mt-2">Baris berwarna merah muda = keterangan (KET) berupa kode angka (tersaring/bermasalah). Bagian ini memakai HTMX: saringan &amp; halaman ditukar tanpa memuat ulang halaman.</p>
     </div>
 </div>
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
-function loadData() {
-    if ($.fn.DataTable.isDataTable('#MHC')) {
-        $('#MHC').DataTable().destroy();
-    }
-    $('#MHC').DataTable({
-        processing: true,
-        serverSide: true,
-        order: [],
-        ajax: {
-            url: "<?= base_url('dashboard/getPemilih') ?>",
-            data: {
-                'desa': $('#DESA').val(),
-                'tms': $('#KET').val(),
-                'tps': $('#TPS').val(),
-                'lp': $('#LP').val()
-            },
-            type: 'post'
-        },
-        columnDefs: [
-            { targets: 0, orderable: false }
-        ],
-        createdRow: function (row, data) {
-            if (data[8] > 0) {
-                $(row).addClass('row-tersaring');
-            }
-        }
-    });
-}
-
-$(document).ready(function () {
-    muatDaftarTps($('#DESA').val());
-    $('#DESA').on('change', function () {
-        muatDaftarTps(this.value);
-    });
-    loadData();
-});
+// Pilot HTMX: tabel Hasil Coklit Dasbor tidak lagi memakai
+// DataTables/jQuery — saringan, opsi TPS, dan pagination berjalan
+// lewat atribut hx-* (HTMX) dan status muat lewat Alpine.js.
 <?= $this->endSection() ?>

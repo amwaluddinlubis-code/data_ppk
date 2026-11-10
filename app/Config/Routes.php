@@ -46,7 +46,9 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     // Beranda: Daftar Hasil Coklit Pantarlih
     $routes->get('/', 'Dashboard::index');
     $routes->post('dashboard/getPemilih', 'Dashboard::getPemilih');
+    $routes->get('dashboard/tabelPemilih', 'Dashboard::tabelPemilih');
     $routes->get('filter/tps', 'Dashboard::daftarTps');
+    $routes->get('filter/tps-opsi', 'Dashboard::opsiTps');
 
     // Pemilih Pindah TPS
     $routes->get('pemilih', 'Pemilih::index');

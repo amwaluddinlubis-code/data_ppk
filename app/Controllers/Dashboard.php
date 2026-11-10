@@ -101,8 +101,106 @@ class Dashboard extends BaseController
         $data['perWilayah']   = $perWilayah;
         $data['perKecamatan'] = $perKecamatan;
         $data['arrDesa']      = $this->daftarDesa();
+        // Pilot HTMX: tabel Hasil Coklit dirender server-side sejak
+        // muat pertama; saringan & pagination berikutnya menukar
+        // potongan tabel lewat endpoint tabelPemilih().
+        $data['tpsAwal']      = $this->ambilDaftarTps('', 'semua');
+        $data['tabelAwal']    = $this->dataTabelPemilih([]);
 
         return view('dashboard', $data);
+    }
+
+    /** Potongan tabel Hasil Coklit untuk HTMX (GET, tanpa muat ulang halaman). */
+    public function tabelPemilih()
+    {
+        $param = [
+            'desa' => trim((string) $this->request->getGet('desa')),
+            'tps'  => trim((string) $this->request->getGet('tps')),
+            'tms'  => trim((string) $this->request->getGet('tms')),
+            'lp'   => trim((string) $this->request->getGet('lp')),
+            'hal'  => (int) $this->request->getGet('hal'),
+            'perhal' => (int) $this->request->getGet('perhal'),
+        ];
+
+        return view('dashboard/_tabel_pemilih', $this->dataTabelPemilih($param));
+    }
+
+    /**
+     * Data satu halaman tabel Hasil Coklit (dipakai muat pertama dan
+     * endpoint HTMX). Saringan sama seperti getPemilih() versi
+     * DataTables; NIK/NKK Pemeriksa disamarkan.
+     *
+     * @param array{desa?: string, tps?: string, tms?: string, lp?: string, hal?: int, perhal?: int} $param
+     * @return array<string, mixed>
+     */
+    private function dataTabelPemilih(array $param): array
+    {
+        $db   = db_connect();
+        $desa = (string) ($param['desa'] ?? '');
+        $tps  = (string) ($param['tps'] ?? '');
+        $ket  = (string) ($param['tms'] ?? '');
+        $lp   = (string) ($param['lp'] ?? '');
+        $perHal = (int) ($param['perhal'] ?? 10);
+        if (! in_array($perHal, [10, 25, 50], true)) {
+            $perHal = 10;
+        }
+        $halaman = max(1, (int) ($param['hal'] ?? 1));
+
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->select('kelurahan.nama AS DESA, mhc.TPS, mhc.NKK, mhc.NIK, mhc.NAMA, mhc.TGLLHR, LEFT(mhc.LAST_UPDATE,10) AS LU, mhc.KET, mhc.JENIS_KELAMIN', false);
+        $this->saringWilayahId($builder);
+        if ($desa !== '') {
+            $kel = $db->table('kelurahan')->select('kelurahan.id AS id')
+                ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+                ->where('kelurahan.nama', $desa);
+            $kecId = \App\Libraries\Wilayah::kecEfektifId();
+            if ($kecId !== null) {
+                $kel->where('kelurahan.kecamatan_id', $kecId);
+            }
+            $kelRow = $kel->get()->getRowArray();
+            $builder->where('mhc.kelurahan_id', $kelRow !== null ? (int) $kelRow['id'] : -1);
+        }
+        if ($tps !== '') {
+            $builder->where('mhc.TPS', $tps);
+        }
+        if ($lp !== '') {
+            $builder->where('mhc.JENIS_KELAMIN', $lp);
+        }
+        if ($ket !== '') {
+            if (Keterangan::isMs($ket)) {
+                $builder->where('mhc.KET', $ket);
+            } elseif ($ket === 'MS') {
+                $builder->whereIn('mhc.KET', Keterangan::MS);
+            } elseif ($ket === 'TMS') {
+                $builder->whereIn('mhc.KET', Keterangan::TMS);
+            }
+        }
+
+        $total    = $builder->countAllResults(false);
+        $totalHal = max(1, (int) ceil($total / $perHal));
+        $halaman  = min($halaman, $totalHal);
+        $rows = $builder->orderBy('kelurahan.nama', 'ASC')
+            ->orderBy('CAST(mhc.TPS AS UNSIGNED)', 'ASC', false)
+            ->orderBy('mhc.NAMA', 'ASC')
+            ->get($perHal, ($halaman - 1) * $perHal)->getResultArray();
+
+        if (session()->get('pengguna_peran') === 'viewer') {
+            foreach ($rows as &$r) {
+                $r['NKK'] = $this->samarkanNomor($r['NKK']);
+                $r['NIK'] = $this->samarkanNomor($r['NIK']);
+            }
+            unset($r);
+        }
+
+        return [
+            'rows'    => $rows,
+            'total'   => $total,
+            'halaman' => $halaman,
+            'totalHal' => $totalHal,
+            'perHal'  => $perHal,
+            'saring'  => ['desa' => $desa, 'tps' => $tps, 'tms' => $ket, 'lp' => $lp],
+        ];
     }
 
     /**
@@ -112,9 +210,30 @@ class Dashboard extends BaseController
      */
     public function daftarTps()
     {
-        $db     = db_connect();
         $desa   = trim((string) $this->request->getGet('desa'));
         $sumber = (string) $this->request->getGet('sumber');
+
+        return $this->response->setJSON(['tps' => $this->ambilDaftarTps($desa, $sumber)]);
+    }
+
+    /** Opsi TPS sebagai potongan HTML untuk ditukar HTMX ke <select>. */
+    public function opsiTps()
+    {
+        $desa   = trim((string) $this->request->getGet('desa'));
+        $sumber = (string) $this->request->getGet('sumber');
+
+        $html = '<option value="">PILIH TPS</option>';
+        foreach ($this->ambilDaftarTps($desa, $sumber) as $nomor) {
+            $html .= '<option value="' . esc($nomor, 'attr') . '">TPS ' . esc($nomor) . '</option>';
+        }
+
+        return $this->response->setContentType('text/html')->setBody($html);
+    }
+
+    /** @return list<string> Nomor TPS yang ada pada data sesuai desa/sumber. */
+    private function ambilDaftarTps(string $desa, string $sumber): array
+    {
+        $db = db_connect();
 
         // Halaman daftar memakai view yang berbeda-beda; TPS harus
         // diambil dari view yang sama agar nomor yang ditawarkan
@@ -165,7 +284,7 @@ class Dashboard extends BaseController
             }
         }
 
-        return $this->response->setJSON(['tps' => array_values(array_unique($daftar))]);
+        return array_values(array_unique($daftar));
     }
 
     public function getPemilih()

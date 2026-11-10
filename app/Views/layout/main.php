@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="<?= base_url('assets/fontawesome/css/all.min.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/datatables.min.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
+    <style>[x-cloak] { display: none !important; }</style>
 </head>
 <body class="bg-base-200 min-h-screen">
 <?php
@@ -234,6 +235,8 @@ $grupMenu[] = ['grup' => 'Akun', 'menu' => [
 
 <script src="<?= base_url('assets/js/jquery.min.js') ?>"></script>
 <script src="<?= base_url('assets/js/jquery.dataTables.min.js') ?>"></script>
+<script src="<?= base_url('assets/js/htmx.min.js') ?>"></script>
+<script defer src="<?= base_url('assets/js/alpine.min.js') ?>"></script>
 <script>
 // Fase 5 (CSRF): sisipkan token pada semua permintaan AJAX POST (DataTables)
 $.ajaxSetup({
