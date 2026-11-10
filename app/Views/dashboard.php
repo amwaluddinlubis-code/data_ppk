@@ -18,7 +18,7 @@ $kartu = [
 <!-- Kartu statistik -->
 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
     <?php foreach ($kartu as $k) : ?>
-        <div class="card bg-base-100 shadow">
+        <div class="card card-statistik bg-base-100 shadow">
             <div class="card-body p-4">
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
