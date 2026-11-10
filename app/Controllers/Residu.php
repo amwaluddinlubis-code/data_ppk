@@ -35,6 +35,7 @@ class Residu extends BaseController
         $data['jmlGanda']     = count($peta);
         $data['jmlKecamatan'] = count(array_filter($peta, static fn ($k) => $k === 'kecamatan'));
         $data['jmlDesa']      = count(array_filter($peta, static fn ($k) => $k === 'desa'));
+        $data['jmlPeringatan'] = $this->hitungPeringatanGender();
         return view('ganda', $data);
     }
 
@@ -77,6 +78,82 @@ class Residu extends BaseController
 
         // Kolom: 0 No, 1 NIK, 2 NKK, 3 Nama, 4 L/P, 5 Kecamatan,
         // 6 Desa, 7 TPS, 8 Keterangan, 9 Sumber, 10 Kategori.
+        return $this->samarkanUntukPemeriksa($json, [1, 2]);
+    }
+
+    /**
+     * Kondisi SQL "jenis kelamin tercatat tidak cocok dengan kode NIK".
+     * NIK mengodekan tanggal lahir pada digit 7-8: laki-laki 01-31,
+     * perempuan 41-71 (tanggal + 40). Baris yang kode harinya di luar
+     * kedua rentang itu tidak dinilai di sini (itu soal sah-tidaknya
+     * NIK, bukan soal kecocokan jenis kelamin).
+     */
+    private function kondisiGender(string $alias = 'm'): string
+    {
+        $hari = "CAST(SUBSTRING({$alias}.NIK, 7, 2) AS UNSIGNED)";
+
+        return "({$alias}.NIK REGEXP '^[0-9]{16}$' AND ("
+            . "({$hari} BETWEEN 1 AND 31 AND {$alias}.JENIS_KELAMIN = 'P') OR "
+            . "({$hari} BETWEEN 41 AND 71 AND {$alias}.JENIS_KELAMIN = 'L')))";
+    }
+
+    /** Jumlah baris peringatan jenis kelamin dalam cakupan pengguna. */
+    private function hitungPeringatanGender(): int
+    {
+        $db       = db_connect();
+        $bindings = [];
+        $sentuh   = '1 = 1';
+        $kecId    = \App\Libraries\Wilayah::kecEfektifId();
+        $kelId    = \App\Libraries\Wilayah::kelurahanIdPengguna();
+        if ($kelId !== null) {
+            $sentuh   = 'm.kelurahan_id = ?';
+            $bindings = [$kelId];
+        } elseif ($kecId !== null) {
+            $sentuh   = 'kel.kecamatan_id = ?';
+            $bindings = [$kecId];
+        }
+
+        $sql = 'SELECT COUNT(*) AS jml FROM mhc m '
+            . 'JOIN kelurahan kel ON kel.id = m.kelurahan_id '
+            . 'WHERE ' . $this->kondisiGender('m') . " AND {$sentuh}";
+
+        return (int) ($db->query($sql, $bindings)->getRow()->jml ?? 0);
+    }
+
+    /**
+     * Tabel peringatan jenis kelamin vs kode NIK. Sifatnya HANYA
+     * peringatan (diminta AMWAL 10 Nov 2026): ketidakcocokan seperti
+     * ini sering berasal dari data Dukcapil, jadi tidak menghalangi
+     * data apa pun — hanya bahan klarifikasi bagi petugas.
+     */
+    public function getPeringatan()
+    {
+        $db      = db_connect();
+        $builder = $db->table('mhc')
+            ->join('kelurahan', 'kelurahan.id = mhc.kelurahan_id')
+            ->join('kecamatan', 'kecamatan.id = kelurahan.kecamatan_id')
+            ->select("mhc.NIK, mhc.NKK, mhc.NAMA, mhc.JENIS_KELAMIN, mhc.SUMBER AS NIK_JK, kecamatan.nama AS KEC, kelurahan.nama AS DESA, mhc.TPS, mhc.KET", false)
+            ->where($this->kondisiGender('mhc'), null, false)
+            ->orderBy('KEC', 'ASC')
+            ->orderBy('DESA', 'ASC')
+            ->orderBy('mhc.NAMA', 'ASC');
+        \App\Libraries\Wilayah::saringId($builder);
+
+        $label = \App\Libraries\Keterangan::daftar();
+        $jk    = ['L' => 'Laki-laki', 'P' => 'Perempuan'];
+        $json  = DataTable::of($builder)
+            ->addNumbering()
+            ->edit('JENIS_KELAMIN', static fn ($row) => $jk[(string) $row->JENIS_KELAMIN] ?? (string) $row->JENIS_KELAMIN)
+            // Kolom NIK_JK meminjam tempat SUMBER pada select (parser
+            // DataTables tidak menerima ekspresi CASE); nilainya dihitung
+            // ulang di sini dari NIK baris itu sendiri.
+            ->edit('NIK_JK', static fn ($row) => ((int) substr((string) $row->NIK, 6, 2)) > 40 ? 'Perempuan' : 'Laki-laki')
+            ->edit('KET', static fn ($row) => $label[(string) $row->KET] ?? (string) $row->KET)
+            ->add('TANDA', static fn () => 'Peringatan')
+            ->toJson();
+
+        // Kolom: 0 No, 1 NIK, 2 NKK, 3 Nama, 4 Tercatat, 5 Menurut NIK,
+        // 6 Kecamatan, 7 Desa, 8 TPS, 9 Keterangan, 10 Tanda.
         return $this->samarkanUntukPemeriksa($json, [1, 2]);
     }
 

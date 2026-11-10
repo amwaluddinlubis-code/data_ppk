@@ -60,6 +60,36 @@
         <p class="text-xs opacity-60 mt-2">Analisis ini hanya memperhatikan <strong>NIK</strong> pada seluruh data coklit: setiap NIK yang tercatat di lebih dari satu desa/kelurahan atau kecamatan dikelompokkan di sini, dan <strong>semua baris</strong> NIK itu ditampilkan (termasuk baris di wilayah seberang) agar mudah dikoordinasikan. Kegandaan di dalam desa yang sama tidak ditampilkan karena merupakan pola normal coklit (baris tersaring + baris baru orang yang sama). Kelompok yang tampil dibatasi pada yang menyentuh wilayah Anda.</p>
     </div>
 </div>
+
+<div class="card bg-base-100 shadow border-2 border-warning mt-4">
+    <div class="card-body p-4">
+        <div class="flex flex-wrap items-center gap-3 mb-2">
+            <div class="text-sm font-bold">PERINGATAN: JENIS KELAMIN TIDAK COCOK DENGAN KODE NIK</div>
+            <div class="badge badge-warning badge-lg"><?= number_format($jmlPeringatan, 0, ',', '.') ?> pemilih</div>
+        </div>
+        <p class="text-xs opacity-70 mb-3">Jenis kelamin yang tercatat berbeda dengan kode pada NIK — pada NIK, perempuan dikodekan sebagai tanggal lahir ditambah 40. Ini <strong>hanya peringatan</strong>: perbedaan seperti ini sering berasal dari data Dukcapil dan belum tentu datanya salah. Gunakan sebagai bahan klarifikasi, dan jangan mengubah data hanya berdasarkan peringatan ini.</p>
+        <div class="overflow-x-auto">
+            <table id="peringatan" class="table table-zebra table-sm w-full">
+                <thead>
+                    <tr>
+                        <th>NO</th>
+                        <th>NIK</th>
+                        <th>NKK</th>
+                        <th>NAMA</th>
+                        <th>TERCATAT</th>
+                        <th>MENURUT NIK</th>
+                        <th>KECAMATAN</th>
+                        <th>DESA</th>
+                        <th>TPS</th>
+                        <th>KETERANGAN</th>
+                        <th>TANDA</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
@@ -93,8 +123,32 @@ function loadData() {
     });
 }
 
+function loadPeringatan() {
+    $('#peringatan').DataTable({
+        processing: true,
+        serverSide: true,
+        order: [],
+        ajax: {
+            url: "<?= base_url('residu/getPeringatan') ?>",
+            type: 'post'
+        },
+        columnDefs: [
+            { targets: 0, orderable: false },
+            { targets: 5, orderable: false },
+            {
+                targets: 10,
+                orderable: false,
+                render: function (data) {
+                    return '<span class="badge badge-warning badge-sm">' + data + '</span>';
+                }
+            }
+        ]
+    });
+}
+
 $(document).ready(function () {
     loadData();
+    loadPeringatan();
     $('#kategori').on('change', function () {
         $('#ganda').DataTable().ajax.reload();
     });

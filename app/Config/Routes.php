@@ -83,4 +83,5 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     // NIK Ganda
     $routes->get('residu', 'Residu::index');
     $routes->post('residu/getGanda', 'Residu::getGanda');
+    $routes->post('residu/getPeringatan', 'Residu::getPeringatan');
 });
