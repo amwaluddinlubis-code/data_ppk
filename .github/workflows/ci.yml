@@ -36,7 +36,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           extensions: curl, dom, fileinfo, gd, intl, mbstring, mysqli, pdo_sqlite, sqlite3, xml, zip
-          coverage: pcov
+          coverage: none
           tools: composer:v2
 
       - name: Validate Composer configuration
@@ -46,7 +46,7 @@ jobs:
         run: composer install --prefer-dist --no-progress --no-interaction --optimize-autoloader
 
       - name: Run PHPUnit test suite
-        run: composer test -- --colors=never
+        run: composer test -- --colors=never --no-coverage
 
   tailwind:
     name: Tailwind CSS build
