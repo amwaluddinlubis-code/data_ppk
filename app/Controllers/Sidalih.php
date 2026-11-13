@@ -82,6 +82,7 @@ class Sidalih extends BaseController
 
         $nama = 'ekspor-sidalih-' . date('Ymd-His') . '.csv';
         $this->catatAkses('ekspor_sidalih', 'format Sidalih (CSV)');
+        $this->catatEkspor('Ekspor Sidalih (CSV)', 'Seluruh cakupan pengguna');
 
         return $this->response
             ->setHeader('Content-Type', 'text/csv; charset=utf-8')
@@ -231,6 +232,7 @@ class Sidalih extends BaseController
             return redirect()->to('sidalih')->with('galat', 'Belum ada hasil banding.');
         }
         @set_time_limit(600);
+        $this->catatEkspor('Unduh Selisih Banding Sidalih (CSV)', 'Hasil banding terakhir');
         $tmp = tempnam(sys_get_temp_dir(), 'sel');
         $out = fopen($tmp, 'wb');
         fwrite($out, "\xEF\xBB\xBF");

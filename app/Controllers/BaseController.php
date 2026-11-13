@@ -149,6 +149,26 @@ abstract class BaseController extends Controller
      * @param callable(): T $hitung
      * @return T
      */
+    /**
+     * Catat ekspor/unduhan data keluar aplikasi ke log_ekspor
+     * (perekaman pemrosesan — UU 27/2022 Pasal 31; Fase G 2026).
+     * Kegagalan pencatatan tidak boleh menggagalkan ekspor itu sendiri.
+     */
+    protected function catatEkspor(string $jenis, ?string $keterangan = null, ?int $jumlah = null): void
+    {
+        try {
+            \Config\Database::connect('default')->table('log_ekspor')->insert([
+                'username'   => (string) (session()->get('pengguna_username') ?? ''),
+                'jenis'      => $jenis,
+                'keterangan' => $keterangan,
+                'jumlah'     => $jumlah,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable) {
+            // Abaikan: log tidak boleh memblokir alur utama.
+        }
+    }
+
     protected function ambilCacheAnalisis(string $nama, callable $hitung, bool $pakaiAcuan = false)
     {
         $cakupan = 'kab';

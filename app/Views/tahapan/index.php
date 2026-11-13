@@ -175,6 +175,7 @@ $judulPanjang = ['dps' => 'Daftar Pemilih Sementara', 'dpshp' => 'Daftar Pemilih
                 <button type="submit" formaction="<?= base_url('tahapan/cetak-rekap-perubahan') ?>" class="btn btn-outline btn-sm" onclick="this.form.querySelector('[name=jenjang]').value='ppk'">P10 · Rekap Perubahan PPK</button>
                 <button type="submit" formaction="<?= base_url('tahapan/cetak-rekap-perubahan') ?>" class="btn btn-outline btn-sm" onclick="this.form.querySelector('[name=jenjang]').value='kabko'">P11 · Rekap Perubahan KabKo</button>
                 <button type="submit" formaction="<?= base_url('tahapan/cetak-rekap-kabko') ?>" class="btn btn-outline btn-sm">P13 · Rekap KabKo</button>
+                <button type="submit" formaction="<?= base_url('tahapan/cetak-rekap-tps') ?>" class="btn btn-outline btn-sm">Rekap Pleno per TPS</button>
                 <button type="submit" formaction="<?= base_url('tahapan/ba') ?>" class="btn btn-outline btn-sm" onclick="this.form.querySelector('[name=jenjang]').value='ppk'">BA PPK</button>
                 <button type="submit" formaction="<?= base_url('tahapan/ba') ?>" class="btn btn-outline btn-sm" onclick="this.form.querySelector('[name=jenjang]').value='kabko'">P14 · BA Kabupaten</button>
             </div>

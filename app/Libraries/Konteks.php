@@ -16,9 +16,11 @@ final class Konteks
 {
     /** @var array<string, string> jenis => label tampilan. */
     public const JENIS = [
-        'pemilu'  => 'Pemilihan Umum (Pemilu)',
-        'pilkada' => 'Pemilihan Kepala Daerah (Pilkada)',
-        'pdpb'    => 'Pemutakhiran Data Pemilih Berkelanjutan (PDPB)',
+        'pemilu'          => 'Pemilihan Umum (Pemilu)',
+        'pilkada'         => 'Pemilihan Kepala Daerah (Pilkada)',
+        'pdpb'            => 'Pemutakhiran Data Pemilih Berkelanjutan (PDPB)',
+        'pemilu_nasional' => 'Pemilu Nasional (DPR, DPD, Presiden)',
+        'pemilu_daerah'   => 'Pemilu Daerah (DPRD & Kepala Daerah)',
     ];
 
     /** @var array<string, string|null> memo per request. */
@@ -76,9 +78,9 @@ final class Konteks
     public static function batasTps(): ?int
     {
         return match (self::jenis()) {
-            'pemilu'  => 300,
-            'pilkada' => 600,
-            default   => null,
+            'pemilu', 'pemilu_nasional' => 300,
+            'pilkada', 'pemilu_daerah'  => 600,
+            default                     => null,
         };
     }
 }

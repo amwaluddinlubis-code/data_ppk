@@ -126,7 +126,7 @@ class Tahapan extends BaseController
         }
         $jenis = Konteks::jenis();
         if ($jenis === 'pdpb') {
-            return redirect()->to('tahapan')->with('galat', 'Tahapan DPS/DPSHP/DPT hanya untuk konteks Pemilu/Pilkada — ubah konteks di menu Konteks Penyelenggaraan.');
+            return redirect()->to('tahapan')->with('galat', 'Tahapan DPS/DPSHP/DPT hanya untuk konteks penyelenggaraan (bukan PDPB) — ubah konteks di menu Konteks Penyelenggaraan.');
         }
         $db = $this->db();
         $nama = Konteks::nama();
@@ -596,6 +596,47 @@ class Tahapan extends BaseController
         return view('tahapan/cetak_rekap_kabko', [
             'title' => 'Model A-Rekap KabKo — ' . self::JUDUL[$tahap['tahap']],
             'tahap' => $tahap, 'baris' => $baris, 'total' => $total, 'judulTahap' => self::JUDUL[$tahap['tahap']],
+            'provinsi' => $peta['provinsi'] ?? '', 'kabupaten' => $peta['kabupaten'] ?? '',
+        ]);
+    }
+
+    /**
+     * Fase H (Pengembangan 2026) — Rekap pleno per TPS dari potret
+     * tahap yang sudah ditetapkan: jumlah pemilih per TPS dirinci
+     * laki-laki/perempuan, dikelompokkan per desa/kelurahan.
+     */
+    public function cetakRekapTps()
+    {
+        $db = $this->db();
+        $tahap = $this->tahapById((int) ($this->request->getGet('tahap_id') ?? 0));
+        if ($tahap === null || $tahap['status'] !== 'ditutup') {
+            return redirect()->to('tahapan')->with('galat', 'Rekap per TPS memerlukan tahap yang sudah ditetapkan.');
+        }
+        $kelPengguna = Wilayah::kelurahanIdPengguna();
+        $kecEfektif = Wilayah::kecEfektifId();
+        $q = 'SELECT kc.nama AS kecamatan, k.nama AS kelurahan, a.tps,
+                COUNT(*) AS jumlah,
+                SUM(a.jenis_kelamin = "L") AS laki,
+                SUM(a.jenis_kelamin = "P") AS perempuan
+              FROM arsip_pemilih a
+              JOIN kelurahan k ON k.id = a.kelurahan_id
+              JOIN kecamatan kc ON kc.id = k.kecamatan_id
+              WHERE a.tahap_id = ?';
+        $bind = [(int) $tahap['id']];
+        if ($kelPengguna !== null) {
+            $q .= ' AND a.kelurahan_id = ?';
+            $bind[] = $kelPengguna;
+        } elseif ($kecEfektif !== null) {
+            $q .= ' AND k.kecamatan_id = ?';
+            $bind[] = $kecEfektif;
+        }
+        $q .= ' GROUP BY kc.nama, k.nama, a.tps ORDER BY kc.nama, k.nama, a.tps';
+        $rows = $db->query($q, $bind)->getResultArray();
+        $peta = $this->pengaturanPeta();
+
+        return view('tahapan/cetak_rekap_tps', [
+            'title' => 'Rekap Pleno per TPS — ' . self::JUDUL[$tahap['tahap']],
+            'tahap' => $tahap, 'rows' => $rows, 'judulTahap' => self::JUDUL[$tahap['tahap']],
             'provinsi' => $peta['provinsi'] ?? '', 'kabupaten' => $peta['kabupaten'] ?? '',
         ]);
     }

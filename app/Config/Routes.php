@@ -157,4 +157,21 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->post('sidalih/bersihkan', 'Sidalih::bersihkan');
     $routes->get('sidalih/unduh-selisih', 'Sidalih::unduhSelisih');
     $routes->get('beban-tps', 'BebanTps::index');
+
+    // Pengembangan 2026 — Coktas PDPB (F3), Pelindungan Data (G), Pengawasan Bawaslu (H)
+    $routes->get('coktas', 'Coktas::index');
+    $routes->post('coktas/simpan', 'Coktas::simpan');
+    $routes->get('coktas/cetak-rekap', 'Coktas::cetakRekap');
+    $routes->post('coktas/filter-simpan', 'Coktas::simpanFilter');
+    $routes->get('coktas/filter-hapus/(:num)', 'Coktas::hapusFilter/$1');
+    $routes->get('permohonan', 'Permohonan::index');
+    $routes->post('permohonan/simpan', 'Permohonan::simpan');
+    $routes->post('permohonan/status', 'Permohonan::status');
+    $routes->get('pelindungan-data', 'PelindunganData::index');
+    $routes->get('bawaslu', 'Bawaslu::index');
+    $routes->post('bawaslu/saran-simpan', 'Bawaslu::saranSimpan');
+    $routes->post('bawaslu/saran-status', 'Bawaslu::saranStatus');
+    $routes->get('bawaslu/uji-petik', 'Bawaslu::ujiPetik');
+    $routes->get('bawaslu/uji-petik.csv', 'Bawaslu::ujiPetikCsv');
+    $routes->get('tahapan/cetak-rekap-tps', 'Tahapan::cetakRekapTps');
 });

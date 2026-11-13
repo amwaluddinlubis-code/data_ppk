@@ -198,6 +198,36 @@ $tglPungut = \App\Libraries\Konteks::tanggalPemungutan();
     </div>
 </div>
 
+<?php // Grafik dasbor (Fase H, Pengembangan 2026): batang MS per wilayah + komposisi L/P. ?>
+<div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+        <h3 class="font-bold text-sm mb-3"><i class="fas fa-chart-bar text-primary"></i> Grafik Pemilih MS per <?= $perKecamatan ? 'Kecamatan' : 'Desa' ?> (12 Terbesar)</h3>
+        <?php
+        $urut = $perWilayah;
+        usort($urut, static fn ($a, $b) => (int) $b['ms'] <=> (int) $a['ms']);
+        $urut = array_slice($urut, 0, 12);
+        $maks = $urut !== [] ? max(1, (int) $urut[0]['ms']) : 1;
+        ?>
+        <?php foreach ($urut as $w) : $lebar = round(100 * (int) $w['ms'] / $maks, 1); ?>
+            <div class="flex items-center gap-2 mb-1 text-sm">
+                <div class="w-44 truncate"><?= esc(ucwords(strtolower($w['wilayah']))) ?></div>
+                <div class="flex-1 bg-base-200 rounded h-4 overflow-hidden"><div class="bg-primary h-4" style="width: <?= $lebar ?>%"></div></div>
+                <div class="w-20 text-right"><?= $fmt($w['ms']) ?></div>
+            </div>
+        <?php endforeach ?>
+        <?php if ($urut === []) : ?><p class="text-sm opacity-60">Belum ada data.</p><?php endif ?>
+        <?php $totLp = (int) ($stats['laki'] ?? 0) + (int) ($stats['perempuan'] ?? 0); ?>
+        <?php if ($totLp > 0) : $pl = round(100 * (int) $stats['laki'] / $totLp, 1); ?>
+            <h4 class="font-semibold text-xs mt-4 mb-1">KOMPOSISI PEMILIH MS — LAKI-LAKI <?= $pl ?>% · PEREMPUAN <?= round(100 - $pl, 1) ?>%</h4>
+            <div class="flex w-full h-5 rounded overflow-hidden">
+                <div class="bg-info" style="width: <?= $pl ?>%"></div>
+                <div class="bg-secondary" style="width: <?= round(100 - $pl, 1) ?>%"></div>
+            </div>
+            <div class="flex justify-between text-xs mt-1"><span>Laki-laki: <?= $fmt($stats['laki']) ?></span><span>Perempuan: <?= $fmt($stats['perempuan']) ?></span></div>
+        <?php endif ?>
+    </div>
+</div>
+
 <!-- Hasil Coklit Pantarlih (pilot HTMX + Alpine) -->
 <div class="card bg-base-100 shadow" data-filter-panel x-data="{ memuat: false }"
      @htmx:before-request="memuat = true" @htmx:after-request="memuat = false">

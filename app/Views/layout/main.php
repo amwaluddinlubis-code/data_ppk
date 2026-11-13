@@ -53,6 +53,7 @@ $grupMenu[] = ['grup' => 'Data Pemilih', 'ikonGrup' => 'fa-users', 'menu' => [
 if (in_array($penggunaLogin['peran'], ['admin', 'operator'], true)) {
     $grupMenu[] = ['grup' => 'Pengolahan', 'ikonGrup' => 'fa-cogs', 'menu' => [
         'coklit'  => ['label' => 'Kelola Data Coklit', 'ikon' => 'fa-pen'],
+        'coktas'  => ['label' => 'Coktas PDPB', 'ikon' => 'fa-clipboard-check'],
         'impor'   => ['label' => 'Impor Data', 'ikon' => 'fa-file-import'],
         'riwayat' => ['label' => 'Riwayat Perubahan', 'ikon' => 'fa-history'],
     ]];
@@ -64,10 +65,13 @@ $grupMenu[] = ['grup' => 'Laporan', 'ikonGrup' => 'fa-chart-bar', 'menu' => [
     'dptb'    => ['label' => 'DPTb & Lokasi Khusus', 'ikon' => 'fa-exchange-alt'],
     'sidalih' => ['label' => 'Banding Sidalih', 'ikon' => 'fa-balance-scale'],
     'beban-tps' => ['label' => 'Beban TPS', 'ikon' => 'fa-gauge-high'],
+    'permohonan' => ['label' => 'Permohonan Perbaikan Data', 'ikon' => 'fa-user-edit'],
+    'bawaslu' => ['label' => 'Pengawasan Bawaslu', 'ikon' => 'fa-eye'],
 ]];
 $menuAdmin = ['kecamatan' => ['label' => 'Kecamatan', 'ikon' => 'fa-map-marked-alt']];
 if ($penggunaLogin['peran'] === 'admin') {
     $menuAdmin['konteks']   = ['label' => 'Konteks Penyelenggaraan', 'ikon' => 'fa-flag'];
+    $menuAdmin['pelindungan-data'] = ['label' => 'Pelindungan Data Pribadi', 'ikon' => 'fa-user-shield'];
     $menuAdmin['pengguna']  = ['label' => 'Kelola Pengguna', 'ikon' => 'fa-users'];
     $menuAdmin['log-akses'] = ['label' => 'Log Akses', 'ikon' => 'fa-shield-alt'];
     $menuAdmin['backup']    = ['label' => 'Cadangan Data', 'ikon' => 'fa-database'];
