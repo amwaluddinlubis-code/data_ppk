@@ -24,7 +24,9 @@ $tglPungut = \App\Libraries\Konteks::tanggalPemungutan();
 <!-- Konteks penyelenggaraan aktif (Fase A) -->
 <div class="flex flex-wrap items-center gap-2 mb-3">
     <span class="badge badge-primary gap-1"><i class="fas fa-flag"></i> <?= esc($konteksNama) ?></span>
-    <span class="badge badge-outline"><?= esc(\App\Libraries\Konteks::labelJenis()) ?></span>
+    <?php if (\App\Libraries\Konteks::labelJenis() !== $konteksNama) : ?>
+        <span class="badge badge-outline"><?= esc(\App\Libraries\Konteks::labelJenis()) ?></span>
+    <?php endif; ?>
     <?php if ($batasTps !== null) : ?>
         <span class="badge badge-outline">Batas <?= $batasTps ?> pemilih/TPS</span>
     <?php endif; ?>
@@ -43,7 +45,7 @@ $tglPungut = \App\Libraries\Konteks::tanggalPemungutan();
             <div class="card-body p-4">
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
-                        <div class="text-[11px] font-semibold uppercase tracking-wide opacity-60 truncate"><?= esc($k['label']) ?></div>
+                        <div class="text-[11px] font-semibold uppercase tracking-wide opacity-60 leading-snug min-h-8"><?= esc($k['label']) ?></div>
                         <div class="text-2xl md:text-3xl font-bold leading-tight"><?= $fmt($k['nilai']) ?></div>
                     </div>
                     <div class="rounded-xl <?= $k['warna'] ?> w-10 h-10 shrink-0 flex items-center justify-center">
@@ -58,10 +60,10 @@ $tglPungut = \App\Libraries\Konteks::tanggalPemungutan();
 <!-- Perlu Ditangani: pintu tugas harian (Paket Menengah) -->
 <div class="card bg-base-100 shadow mb-4">
     <div class="card-body p-4">
-        <div class="flex items-center gap-2 mb-3">
+        <div class="flex flex-wrap items-center gap-2 mb-3">
             <i class="fas fa-clipboard-check text-warning"></i>
             <span class="font-bold text-sm">PERLU DITANGANI</span>
-            <span class="text-xs opacity-60">Temuan data yang menunggu pemeriksaan Anda — klik untuk membuka daftarnya.</span>
+            <span class="text-xs opacity-60 basis-full sm:basis-auto">Temuan data yang menunggu pemeriksaan Anda — klik untuk membuka daftarnya.</span>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
             <?php
@@ -166,7 +168,7 @@ $tglPungut = \App\Libraries\Konteks::tanggalPemungutan();
                         <tr>
                             <th><?= $perKecamatan ? 'Kecamatan' : 'Desa' ?></th>
                             <th class="text-right">Total</th>
-                            <th class="w-40 hidden md:table-cell">MS</th>
+                            <th class="w-40 hidden md:table-cell">% MS</th>
                             <th class="text-right">MS</th>
                             <th class="text-right hidden sm:table-cell">Baru</th>
                             <th class="text-right hidden sm:table-cell">Tersaring</th>

@@ -217,8 +217,10 @@ if ($bebasWilayah) {
                     <div class="min-w-0 flex-1">
                         <div class="truncate text-sm font-bold"><?= esc($penggunaLogin['nama']) ?></div>
                         <div class="mt-1 flex items-center gap-1.5">
-                            <span class="badge badge-primary badge-xs"><?= esc($labelPeran) ?></span>
-                            <span class="truncate text-[11px] opacity-60"><?= esc($labelTingkat) ?></span>
+                            <span class="badge badge-primary badge-xs shrink-0 whitespace-nowrap"><?= esc($labelPeran) ?></span>
+                            <?php if ($labelTingkat !== $labelPeran) : ?>
+                                <span class="truncate text-[11px] opacity-60"><?= esc($labelTingkat) ?></span>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <i class="fas fa-circle text-[7px] text-success" title="Sesi aktif" aria-label="Sesi aktif"></i>
