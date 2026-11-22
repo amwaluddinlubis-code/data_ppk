@@ -391,3 +391,26 @@ Langkah basis data baru: buat basis data kosong → arahkan `.env` →
 ### Skrip impor Windows (`impor_madina.bat`)
 
 Skrip ini mencatat keluaran proses ke `hasil_impor.txt` dan meneruskan kode keluar proses impor ke pemanggil. Jika migrasi, penyiapan akun admin, atau impor gagal, skrip berakhir dengan kode non-nol; jangan menganggap proses berhasil hanya karena jendela menampilkan log. Perintah `impor:massal` juga mengembalikan status gagal bila satu atau lebih berkas tidak dapat diproses, sehingga kegagalan tingkat berkas tidak tertutup oleh keberhasilan berkas lain. Periksa `hasil_impor.txt` untuk pesan kegagalan.
+
+## Perbaikan & Audit QA (22 November 2026)
+
+- **Normalisasi tanggal impor tidak lagi memakai `strtotime`.**
+  `ImporCoklit::normalisasiTanggal()` (dipakai `TGL_COKLIT` dan
+  `LAST_UPDATE` pada impor web maupun konsol) kini mengurai teks secara
+  eksplisit lewat pengurai yang sama dengan tanggal lahir. Sebelumnya,
+  tanggal berformat Indonesia DD/MM/YYYY dibaca secara Amerika:
+  tanggal di atas 12 gagal total (tersimpan kosong) dan sisanya
+  tertukar diam-diam (05/02/2023 terbaca 2 Mei). Tes unit baru di
+  `tests/unit/ImporCoklitTest.php` mengunci perilaku ini.
+- **Audit menyeluruh di MySQL mode ketat** (ONLY_FULL_GROUP_BY) dengan
+  data contoh 7.864 baris: seluruh halaman, ekspor CSV/XLSX, siklus
+  CRUD coklit + pulihkan dari Riwayat, cadangan basis data, dan impor
+  web — tidak ada error 500 / pengecualian basis data baru.
+- **QA peran**: operator terkurung pada kecamatan cakupannya (dasbor,
+  daftar, dan ekspor hanya wilayahnya; halaman admin teralihkan), dan
+  Pemeriksa melihat NIK tersamar (4 angka awal + 4 akhir) tanpa akses
+  olah data, dengan cetak tetap tersedia.
+- **QA cetak**: formulir Model A-Daftar Pemilih per TPS (jumlah baris
+  sama persis dengan basis data), Model A-Rekap KabKo, Berita Acara
+  kabupaten, rekap & BA PDPB, dan cetak daftar MS dirender dengan
+  benar dari potret tahap yang dibekukan.

@@ -38,4 +38,30 @@ final class ImporCoklitTest extends CIUnitTestCase
         $judul = ['KELURAHAN', 'DPID', 'KETERANGAN', 'KET', 'DESA'];
         $this->assertSame('sidalih', ImporCoklit::deteksiFormat($judul));
     }
+
+    public function testNormalisasiTanggalFormatIndonesia(): void
+    {
+        // DD/MM/YYYY dengan tanggal di atas 12 tidak boleh jadi null.
+        $this->assertSame('2023-02-15', ImporCoklit::normalisasiTanggal('15/02/2023'));
+        // Tanggal ambigu tidak boleh tertukar bulan-tanggal (gaya Amerika).
+        $this->assertSame('2023-02-05', ImporCoklit::normalisasiTanggal('05/02/2023'));
+        $this->assertSame('2023-02-15', ImporCoklit::normalisasiTanggal('15-02-2023'));
+    }
+
+    public function testNormalisasiTanggalIsoDanExcel(): void
+    {
+        $this->assertSame('2023-02-15', ImporCoklit::normalisasiTanggal('2023-02-15'));
+        // Bagian jam pada LAST_UPDATE dibuang.
+        $this->assertSame('2023-03-01', ImporCoklit::normalisasiTanggal('2023-03-01 08:00:00'));
+        // Nomor seri Excel: 44972 = 15 Februari 2023.
+        $this->assertSame('2023-02-15', ImporCoklit::normalisasiTanggal(44972));
+    }
+
+    public function testNormalisasiTanggalTidakSah(): void
+    {
+        $this->assertNull(ImporCoklit::normalisasiTanggal('31/02/2023'));
+        $this->assertNull(ImporCoklit::normalisasiTanggal('bukan tanggal'));
+        $this->assertNull(ImporCoklit::normalisasiTanggal(''));
+        $this->assertNull(ImporCoklit::normalisasiTanggal(null));
+    }
 }

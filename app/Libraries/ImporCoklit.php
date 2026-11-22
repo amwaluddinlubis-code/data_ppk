@@ -199,21 +199,36 @@ final class ImporCoklit
         return null;
     }
 
-    /** Normalisasi tanggal Excel (nomor seri) / teks menjadi Y-m-d. */
+    /**
+     * Normalisasi tanggal Excel (nomor seri) / teks menjadi Y-m-d.
+     * Bagian teks diurai eksplisit lewat tanggalLahirIso() — BUKAN
+     * strtotime, yang membaca DD/MM/YYYY secara Amerika: tanggal di
+     * atas 12 gagal total (jadi null) dan sisanya tertukar diam-diam
+     * (05/02/2023 terbaca 2 Mei, bukan 5 Februari).
+     */
     public static function normalisasiTanggal($nilai): ?string
     {
         if ($nilai === null || $nilai === '') {
             return null;
         }
         if (is_numeric($nilai)) {
-            try {
-                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float) $nilai)->format('Y-m-d');
-            } catch (\Throwable) {
-                return null;
+            $seri = (float) $nilai;
+            if ($seri > 0.0 && $seri < 100000.0) {
+                try {
+                    return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($seri)->format('Y-m-d');
+                } catch (\Throwable) {
+                    return null;
+                }
             }
-        }
-        $ts = strtotime((string) $nilai);
 
-        return $ts === false ? null : date('Y-m-d', $ts);
+            return null;
+        }
+        $s = trim((string) $nilai);
+        // Buang bagian jam bila ada ("2023-03-01 08:00:00").
+        if (preg_match('/^(\S+)[ T]\d{1,2}:\d{2}/', $s, $m)) {
+            $s = $m[1];
+        }
+
+        return self::tanggalLahirIso($s);
     }
 }
