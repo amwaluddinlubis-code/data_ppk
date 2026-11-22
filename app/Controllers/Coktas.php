@@ -90,7 +90,7 @@ class Coktas extends BaseController
         $progres = $db->query(
             'SELECT k.id, k.nama, kc.nama AS kecamatan,
                 COUNT(m.ID) AS ms,
-                SUM(m.TGL_COKLIT IS NOT NULL AND m.TGL_COKLIT <> "") AS tercoklit,
+                SUM(m.TGL_COKLIT IS NOT NULL) AS tercoklit,
                 (SELECT COUNT(*) FROM coktas c JOIN mhc m2 ON m2.ID = c.mhc_id
                   WHERE c.periode_id = ? AND m2.kelurahan_id = k.id) AS tercoktas,
                 (SELECT COUNT(*) FROM coktas c JOIN mhc m2 ON m2.ID = c.mhc_id

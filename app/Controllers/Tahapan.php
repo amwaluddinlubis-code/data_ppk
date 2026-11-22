@@ -345,7 +345,7 @@ class Tahapan extends BaseController
         $rows = $this->db()->query("SELECT TPS AS tps,
                 COUNT(DISTINCT NKK) AS kk,
                 COUNT(*) AS terdaftar,
-                SUM(TGL_COKLIT IS NOT NULL AND TGL_COKLIT <> '') AS tercoklit,
+                SUM(TGL_COKLIT IS NOT NULL) AS tercoklit,
                 SUM(KET IN ('0','U','B')) AS ms,
                 SUM(KET IN ('1','2','3','4','5','6','7','8')) AS tms
             FROM mhc WHERE kelurahan_id = ? GROUP BY TPS ORDER BY TPS", [$kelId])->getResultArray();
