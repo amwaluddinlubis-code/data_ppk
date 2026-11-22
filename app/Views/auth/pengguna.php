@@ -113,7 +113,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('javascript') ?>
-<script>
 function salinSandiReset(tombol) {
     var teks = document.getElementById('sandi-reset-sekali').textContent.trim();
     if (navigator.clipboard) {
@@ -141,5 +140,4 @@ function salinSandiReset(tombol) {
     kec.addEventListener('change', saring);
     saring();
 })();
-</script>
 <?= $this->endSection() ?>
