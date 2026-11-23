@@ -84,6 +84,8 @@ Setiap pengguna **hanya bisa melihat dan mengolah wilayahnya sendiri**. PPK keca
 
 Buka alamat aplikasi di peramban, isi **nama pengguna** dan **kata sandi**, lalu klik tombol masuk. Pada pemakaian pertama, aplikasi meminta pengguna mengganti kata sandi bawaan — lakukan segera demi keamanan.
 
+Halaman masuk mempunyai **dua tampilan** yang cara pakainya sama persis: *Versi 1 — Klasik* (panel informasi di kiri, formulir di kanan) dan *Versi 2 — Kartu Tengah* (satu kartu di tengah layar beraksen emas). Pilihan tampilan diatur oleh **Admin Kabupaten** di menu Administrasi → Konteks Penyelenggaraan, kartu **Halaman Masuk**, dan berlaku seketika untuk semua pengguna.
+
 ![Halaman masuk aplikasi](manual-gambar/01-login.png)
 
 ## 2.2 Bagian-bagian layar
@@ -94,6 +96,8 @@ Setelah masuk, layar terbagi menjadi:
 - **Cakupan wilayah** — tulisan di bawah nama pengguna menunjukkan wilayah yang sedang Anda lihat (seluruh kabupaten, satu kecamatan, atau satu desa).
 - **Kotak pencarian cepat (atas)** — ketik nama, NIK, atau NKK dari halaman mana pun untuk melompat ke pemilih yang dicari.
 - **Tombol tema** — ikon bulan/matahari untuk beralih tampilan terang dan gelap.
+- **Tombol "Lipat menu"** — di kaki menu samping (layar lebar): melipat menu menjadi rel ikon agar ruang tabel lebih luas; klik ikon kelompok menu untuk membentangkannya lagi. Pilihan tersimpan di peramban.
+- **Lencana kode keterangan (KET)** — pada tabel, kode keterangan tampil sebagai lencana berwarna: **hijau** untuk pemilih MS (kode 0 dan U), **biru** untuk pemilih baru (B), **merah** untuk TMS (kode 1–7), dan **kuning** untuk kode 8. Arahkan kursor ke lencana untuk melihat nama lengkap keterangannya.
 - **Kotak ketik pilihan** — semua kotak pilihan (desa, TPS, status, dan lain-lain) bisa **diketik untuk menyaring**, tidak perlu menggulir daftar panjang.
 
 ## 2.3 Mengatur konteks lebih dulu

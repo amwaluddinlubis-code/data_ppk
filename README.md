@@ -414,3 +414,32 @@ Skrip ini mencatat keluaran proses ke `hasil_impor.txt` dan meneruskan kode kelu
   sama persis dengan basis data), Model A-Rekap KabKo, Berita Acara
   kabupaten, rekap & BA PDPB, dan cetak daftar MS dirender dengan
   benar dari potret tahap yang dibekukan.
+
+## Pembaruan UI/UX & Halaman Masuk v2 (23 November 2026)
+
+- **Halaman masuk v2 ("Kartu Tengah")** — tampilan masuk alternatif:
+  satu kartu di tengah layar di atas latar gradasi penuh beraksen
+  emas KPU, tanpa panel samping. Admin Kabupaten mengaktifkan/
+  menonaktifkannya di Konteks Penyelenggaraan → kartu **Halaman
+  Masuk**; pilihan tersimpan sebagai kunci `versi_login` pada tabel
+  `pengaturan` (bawaan `1`) dan berlaku seketika untuk semua
+  pengguna. Pembaca pengaturan kini terpusat di
+  `App\Libraries\Pengaturan` (+ tes unit).
+- **Cangkang aplikasi** — menu samping kini bisa dilipat menjadi
+  **rel ikon** di layar lebar (tombol "Lipat menu", pilihan tersimpan
+  per peramban), menu aktif beraksen garis emas, bilah atas memuat
+  lencana konteks penyelenggaraan aktif, dan pemberitahuan (flash)
+  berikon.
+- **Dasbor** — konteks aktif tampil sebagai **pita gradasi** dengan
+  tombol ubah konteks; kartu KPI berstrip warna per kartu dengan
+  keterangan porsi dari total; kartu "Perlu Ditangani" berikon dan
+  beraksen tepi.
+- **Lencana kode keterangan** — kode KET pada tabel (daftar pemilih,
+  coklit, tabel dasbor) kini lencana berwarna dari satu sumber
+  `App\Libraries\Keterangan::lencana()`: hijau MS (0, U), biru baru
+  (B), merah TMS (1–7), kuning kode 8; nama lengkap pada atribut
+  judul. Tes unit bertambah menjadi **32 tes / 94 asersi** (hijau).
+- QA ulang menyeluruh setelah perubahan: sapuan 26 halaman + varian
+  kecamatan aktif tanpa error, QA peran operator/Pemeriksa lulus,
+  kedua tema (terang/gelap), mode rel, dan tampilan ponsel diperiksa
+  lewat tangkapan layar sebelum–sesudah.
