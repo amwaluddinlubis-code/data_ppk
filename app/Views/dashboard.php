@@ -6,13 +6,15 @@ $fmt = static fn ($n) => number_format((int) $n, 0, ',', '.');
 $totalMs = max(1, (int) $stats['ms']);
 $pctL = $stats['ms'] > 0 ? round($stats['laki'] / $totalMs * 100, 1) : 0;
 $pctP = $stats['ms'] > 0 ? round($stats['perempuan'] / $totalMs * 100, 1) : 0;
+$totalAman = max(1, (int) $stats['total']);
+$pct = static fn ($n) => number_format($n / $totalAman * 100, 1, ',', '.') . '% dari total';
 $kartu = [
-    ['label' => 'Total Hasil Coklit', 'nilai' => $stats['total'], 'ikon' => 'fa-clipboard-list', 'warna' => 'bg-primary text-primary-content'],
-    ['label' => 'Pemilih MS (Aktif)', 'nilai' => $stats['ms'], 'ikon' => 'fa-user-check', 'warna' => 'bg-success text-success-content'],
-    ['label' => 'Pemilih Baru', 'nilai' => $stats['baru'], 'ikon' => 'fa-user-plus', 'warna' => 'bg-info text-info-content'],
-    ['label' => 'Tersaring (TMS)', 'nilai' => $stats['tersaring'], 'ikon' => 'fa-filter', 'warna' => 'bg-error text-error-content'],
-    ['label' => 'Pindah TPS', 'nilai' => $stats['pindah'], 'ikon' => 'fa-exchange-alt', 'warna' => 'bg-warning text-warning-content'],
-    ['label' => 'Jumlah KK (MS)', 'nilai' => $stats['kk'], 'ikon' => 'fa-home', 'warna' => 'bg-secondary text-secondary-content'],
+    ['label' => 'Total Hasil Coklit', 'nilai' => $stats['total'], 'ikon' => 'fa-clipboard-list', 'aksen' => '#2563eb', 'kaki' => 'Seluruh baris coklit wilayah aktif'],
+    ['label' => 'Pemilih MS (Aktif)', 'nilai' => $stats['ms'], 'ikon' => 'fa-user-check', 'aksen' => '#16a34a', 'kaki' => $pct($stats['ms'])],
+    ['label' => 'Pemilih Baru', 'nilai' => $stats['baru'], 'ikon' => 'fa-user-plus', 'aksen' => '#0284c7', 'kaki' => $pct($stats['baru'])],
+    ['label' => 'Tersaring (TMS)', 'nilai' => $stats['tersaring'], 'ikon' => 'fa-filter', 'aksen' => '#dc2626', 'kaki' => $pct($stats['tersaring'])],
+    ['label' => 'Pindah TPS', 'nilai' => $stats['pindah'], 'ikon' => 'fa-exchange-alt', 'aksen' => '#f59e0b', 'kaki' => $pct($stats['pindah'])],
+    ['label' => 'Jumlah KK (MS)', 'nilai' => $stats['kk'], 'ikon' => 'fa-home', 'aksen' => '#0891b2', 'kaki' => 'Kartu keluarga pemilih MS'],
 ];
 ?>
 <?php
@@ -21,37 +23,51 @@ $konteksNama = \App\Libraries\Konteks::nama();
 $batasTps = \App\Libraries\Konteks::batasTps();
 $tglPungut = \App\Libraries\Konteks::tanggalPemungutan();
 ?>
-<!-- Konteks penyelenggaraan aktif (Fase A) -->
-<div class="flex flex-wrap items-center gap-2 mb-3">
-    <span class="badge badge-primary gap-1"><i class="fas fa-flag"></i> <?= esc($konteksNama) ?></span>
-    <?php if (\App\Libraries\Konteks::labelJenis() !== $konteksNama) : ?>
-        <span class="badge badge-outline"><?= esc(\App\Libraries\Konteks::labelJenis()) ?></span>
-    <?php endif; ?>
-    <?php if ($batasTps !== null) : ?>
-        <span class="badge badge-outline">Batas <?= $batasTps ?> pemilih/TPS</span>
-    <?php endif; ?>
-    <?php if ($tglPungut !== null) : ?>
-        <span class="badge badge-outline">Pemungutan: <?= esc(date('d-m-Y', strtotime($tglPungut))) ?></span>
-    <?php endif; ?>
-    <?php if (session()->get('pengguna_peran') === 'admin') : ?>
-        <a href="<?= base_url('konteks') ?>" class="link link-primary text-xs">Ubah konteks</a>
-    <?php endif; ?>
+<!-- Konteks penyelenggaraan aktif (Fase A): pita pahlawan dasbor -->
+<div class="pita-konteks mb-4">
+    <div class="pointer-events-none absolute -right-10 -top-16 h-44 w-44 rounded-full border-[16px] border-white/10"></div>
+    <div class="pointer-events-none absolute -right-2 -top-8 h-24 w-24 rounded-full border-[9px] border-amber-300/25"></div>
+    <div class="relative flex flex-wrap items-center gap-4">
+        <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] opacity-80">
+                <i class="fas fa-flag"></i> Konteks penyelenggaraan aktif
+            </div>
+            <div class="mt-1.5 text-xl md:text-2xl font-bold leading-tight"><?= esc($konteksNama) ?></div>
+            <div class="mt-2.5 flex flex-wrap gap-1.5">
+                <?php if (\App\Libraries\Konteks::labelJenis() !== $konteksNama) : ?>
+                    <span class="badge border-white/25 bg-white/10 text-white"><?= esc(\App\Libraries\Konteks::labelJenis()) ?></span>
+                <?php endif; ?>
+                <?php if ($batasTps !== null) : ?>
+                    <span class="badge border-white/25 bg-white/10 text-white">Batas <?= $batasTps ?> pemilih/TPS</span>
+                <?php endif; ?>
+                <?php if ($tglPungut !== null) : ?>
+                    <span class="badge border-white/25 bg-white/10 text-white">Pemungutan: <?= esc(date('d-m-Y', strtotime($tglPungut))) ?></span>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php if (session()->get('pengguna_peran') === 'admin') : ?>
+            <a href="<?= base_url('konteks') ?>" class="btn btn-sm border-white/30 bg-white/15 text-white hover:bg-white/25">
+                <i class="fas fa-pen"></i> Ubah konteks
+            </a>
+        <?php endif; ?>
+    </div>
 </div>
 
 <!-- Kartu statistik -->
 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-4">
     <?php foreach ($kartu as $k) : ?>
-        <div class="card bg-base-100 shadow">
+        <div class="card kpi bg-base-100 shadow" style="--kpi: <?= $k['aksen'] ?>">
             <div class="card-body p-4">
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">
                         <div class="text-[11px] font-semibold uppercase tracking-wide opacity-60 leading-snug min-h-8"><?= esc($k['label']) ?></div>
-                        <div class="text-2xl md:text-3xl font-bold leading-tight"><?= $fmt($k['nilai']) ?></div>
+                        <div class="text-3xl font-extrabold tracking-tight leading-tight"><?= $fmt($k['nilai']) ?></div>
                     </div>
-                    <div class="rounded-xl <?= $k['warna'] ?> w-10 h-10 shrink-0 flex items-center justify-center">
+                    <div class="kpi-ikon rounded-xl w-10 h-10 shrink-0 flex items-center justify-center">
                         <i class="fas <?= $k['ikon'] ?>"></i>
                     </div>
                 </div>
+                <div class="mt-1.5 text-[11px] opacity-55"><?= esc($k['kaki']) ?></div>
             </div>
         </div>
     <?php endforeach; ?>
@@ -76,10 +92,13 @@ $tglPungut = \App\Libraries\Konteks::tanggalPemungutan();
             ];
             ?>
             <?php foreach ($kartuPerlu as $k) : ?>
-                <a href="<?= $k['tautan'] ?>" class="card <?= $k['nilai'] > 0 ? 'bg-warning/10 border border-warning/40' : 'bg-base-200/60' ?> hover:shadow transition">
+                <a href="<?= $k['tautan'] ?>" class="card <?= $k['nilai'] > 0 ? 'bg-warning/10 border border-warning/40 border-l-4 border-l-warning' : 'bg-base-200/60 border-l-4 border-l-base-300' ?> hover:shadow transition">
                     <div class="card-body p-3">
-                        <div class="flex items-center gap-2 text-xs font-semibold opacity-70">
-                            <i class="fas <?= $k['ikon'] ?>"></i> <?= esc($k['label']) ?>
+                        <div class="flex items-center gap-2">
+                            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg <?= $k['nilai'] > 0 ? 'bg-warning/20 text-warning' : 'bg-base-300/50 opacity-50' ?>">
+                                <i class="fas <?= $k['ikon'] ?>"></i>
+                            </span>
+                            <span class="text-xs font-semibold opacity-70 leading-tight"><?= esc($k['label']) ?></span>
                         </div>
                         <div class="text-2xl font-bold mt-1">
                             <?= number_format($k['nilai'], 0, ',', '.') ?> <span class="text-xs font-normal opacity-60"><?= esc($k['satuan']) ?></span>

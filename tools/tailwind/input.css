@@ -122,6 +122,87 @@
     margin-left: 0.5rem;
     font-size: 0.7rem;
   }
+
+  /* Pita konteks penyelenggaraan (dasbor): pahlawan visual halaman. */
+  .pita-konteks {
+    @apply relative overflow-hidden rounded-3xl p-5 text-primary-content shadow-lg;
+    background-image: linear-gradient(120deg, oklch(var(--p)) 0%, oklch(var(--s)) 130%);
+    box-shadow: 0 12px 28px -12px oklch(var(--p) / 0.55);
+  }
+
+  /* Kartu KPI dasbor: strip aksen warna di tepi atas mengikuti --kpi. */
+  .kpi {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: var(--kpi, oklch(var(--p)));
+  }
+
+  .kpi-ikon {
+    background-color: color-mix(in oklab, var(--kpi, oklch(var(--p))) 14%, transparent);
+    color: var(--kpi, oklch(var(--p)));
+  }
+
+  /* Bilah gulir tipis untuk navigasi samping. */
+  #nav-samping {
+    scrollbar-width: thin;
+  }
+
+  #nav-samping::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  #nav-samping::-webkit-scrollbar-thumb {
+    background-color: oklch(var(--b3));
+    border-radius: 9999px;
+  }
+}
+
+/* Mode rel ikon sidebar (desktop): sidebar menyusut jadi rel ikon.
+   Kelas rel-samping dipasang di <html> sebelum gambar pertama. */
+@media (min-width: 1024px) {
+  html.rel-samping .drawer-side aside {
+    width: 5.25rem;
+  }
+
+  html.rel-samping .rel-teks,
+  html.rel-samping .rel-blok {
+    display: none !important;
+  }
+
+  html.rel-samping #kepala-merek .flex {
+    justify-content: center;
+  }
+
+  html.rel-samping #nav-samping a {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  html.rel-samping #nav-samping .collapse {
+    border-color: transparent;
+    background: transparent;
+  }
+
+  html.rel-samping #nav-samping .collapse-content,
+  html.rel-samping #nav-samping .collapse-title::after {
+    display: none;
+  }
+
+  html.rel-samping #nav-samping .collapse-title {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  html.rel-samping .app-footer {
+    left: 5.25rem;
+  }
 }
 
 @media (min-width: 1024px) {

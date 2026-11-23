@@ -11,6 +11,12 @@
             var tema = 'terang';
             try { tema = localStorage.getItem('tema-pemilih') || 'terang'; } catch (e) {}
             document.documentElement.setAttribute('data-theme', tema === 'gelap' ? 'gelap' : 'terang');
+            // Mode rel ikon sidebar (desktop) diterapkan sedini mungkin.
+            try {
+                if (localStorage.getItem('samping-rel') === '1') {
+                    document.documentElement.classList.add('rel-samping');
+                }
+            } catch (e) {}
         })();
     </script>
     <link rel="stylesheet" href="<?= base_url('assets/fontawesome/css/all.min.css') ?>">
@@ -119,19 +125,22 @@ if ($bebasWilayah) {
                     <?= $namaKabupaten !== '' ? 'Kabupaten ' . esc($namaKabupaten) . ' &middot; ' : '' ?><?= esc($scopeLabel) ?>
                 </div>
             </div>
-            <div class="flex-none hidden md:flex">
+            <div class="flex-none hidden md:flex items-center gap-1.5">
                 <span class="badge badge-primary badge-outline gap-1">
                     <i class="fas fa-map-marker-alt"></i> <?= esc($scopeLabel) ?>
+                </span>
+                <span class="badge badge-ghost gap-1 hidden xl:inline-flex max-w-56" title="Konteks penyelenggaraan aktif">
+                    <i class="fas fa-flag text-accent"></i> <span class="truncate"><?= esc(\App\Libraries\Konteks::nama()) ?></span>
                 </span>
             </div>
             <div class="flex-none hidden sm:block mx-1">
                 <form method="get" action="<?= base_url('cari') ?>" class="join" role="search">
                     <input type="text" name="q" minlength="3" required
-                           class="input input-bordered input-sm join-item w-40 lg:w-56"
+                           class="input input-bordered input-sm join-item w-44 lg:w-64 rounded-l-full"
                            placeholder="Cari nama / NIK / NKK…"
                            value="<?= esc((string) ($_GET['q'] ?? ''), 'attr') ?>"
                            title="Pencarian global: nama, NIK, atau NKK di seluruh data">
-                    <button type="submit" class="btn btn-sm btn-primary join-item" title="Pencarian global" aria-label="Pencarian global">
+                    <button type="submit" class="btn btn-sm btn-primary join-item rounded-r-full" title="Pencarian global" aria-label="Pencarian global">
                         <i class="fas fa-search"></i>
                     </button>
                 </form>
@@ -167,13 +176,13 @@ if ($bebasWilayah) {
         <!-- Isi halaman -->
         <main class="p-3 md:p-5 pb-32 lg:pb-16 w-full max-w-[1600px] mx-auto">
             <?php if (session()->getFlashdata('galat')) : ?>
-                <div class="alert alert-error text-sm mb-3"><?= esc(session()->getFlashdata('galat')) ?></div>
+                <div class="alert alert-error text-sm mb-3 shadow-sm"><i class="fas fa-circle-exclamation"></i><span><?= esc(session()->getFlashdata('galat')) ?></span></div>
             <?php endif; ?>
             <?php if (session()->getFlashdata('sukses')) : ?>
-                <div class="alert alert-success text-sm mb-3"><?= esc(session()->getFlashdata('sukses')) ?></div>
+                <div class="alert alert-success text-sm mb-3 shadow-sm"><i class="fas fa-circle-check"></i><span><?= esc(session()->getFlashdata('sukses')) ?></span></div>
             <?php endif; ?>
             <?php if (session()->getFlashdata('info')) : ?>
-                <div class="alert alert-info text-sm mb-3"><?= esc(session()->getFlashdata('info')) ?></div>
+                <div class="alert alert-info text-sm mb-3 shadow-sm"><i class="fas fa-circle-info"></i><span><?= esc(session()->getFlashdata('info')) ?></span></div>
             <?php endif; ?>
             <?= $this->renderSection('content') ?>
         </main>
@@ -189,20 +198,21 @@ if ($bebasWilayah) {
     <div class="drawer-side z-40">
         <label for="drawer-utama" class="drawer-overlay" aria-label="Tutup menu"></label>
         <aside class="bg-base-100 w-72 min-h-full flex flex-col border-r border-base-300 shadow-xl">
-            <div class="relative overflow-hidden bg-gradient-to-br from-primary to-secondary p-5 text-primary-content">
+            <div class="relative overflow-hidden bg-gradient-to-br from-primary to-secondary p-5 text-primary-content" id="kepala-merek">
                 <div class="pointer-events-none absolute -right-7 -top-10 h-32 w-32 rounded-full border-[18px] border-white/10"></div>
+                <div class="pointer-events-none absolute -right-2 -top-5 h-20 w-20 rounded-full border-[10px] border-amber-300/25"></div>
                 <div class="relative flex items-center gap-3">
-                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-xl shadow-inner">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-xl shadow-inner ring-1 ring-amber-300/50">
                         <i class="fas fa-vote-yea"></i>
                     </div>
-                    <div class="min-w-0">
+                    <div class="min-w-0 rel-teks">
                         <div class="font-bold text-lg leading-tight">Data Pemilih</div>
                         <div class="mt-1 truncate text-xs opacity-80">
                             <?= $namaKabupaten !== '' ? 'Kabupaten ' . esc($namaKabupaten) : 'Aplikasi Analisis Data Pemilih' ?>
                         </div>
                     </div>
                 </div>
-                <div class="relative mt-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] opacity-80">
+                <div class="relative mt-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] opacity-80 rel-teks">
                     <span class="h-1.5 w-1.5 rounded-full bg-success-content"></span>
                     Sistem operasional
                 </div>
@@ -214,7 +224,7 @@ if ($bebasWilayah) {
                             <span class="text-sm font-bold"><?= esc($inisial) ?></span>
                         </div>
                     </div>
-                    <div class="min-w-0 flex-1">
+                    <div class="min-w-0 flex-1 rel-teks">
                         <div class="truncate text-sm font-bold"><?= esc($penggunaLogin['nama']) ?></div>
                         <div class="mt-1 flex items-center gap-1.5">
                             <span class="badge badge-primary badge-xs shrink-0 whitespace-nowrap"><?= esc($labelPeran) ?></span>
@@ -223,11 +233,11 @@ if ($bebasWilayah) {
                             <?php endif; ?>
                         </div>
                     </div>
-                    <i class="fas fa-circle text-[7px] text-success" title="Sesi aktif" aria-label="Sesi aktif"></i>
+                    <i class="fas fa-circle text-[7px] text-success rel-teks" title="Sesi aktif" aria-label="Sesi aktif"></i>
                 </div>
             </div>
             <?php if ($bebasWilayah) : ?>
-                <div class="border-b border-base-200 px-3 py-3">
+                <div class="border-b border-base-200 px-3 py-3 rel-blok">
                     <form method="post" action="<?= base_url('kecamatan/aktifkan') ?>">
                         <?= csrf_field() ?>
                         <div class="mb-1.5 flex items-center gap-2 px-1 text-[10px] font-bold uppercase tracking-[0.16em] opacity-55">
@@ -250,7 +260,7 @@ if ($bebasWilayah) {
                 </div>
             <?php endif; ?>
             <nav class="flex-1 overflow-y-auto p-3" id="nav-samping" aria-label="Navigasi utama">
-                <label class="input input-bordered input-sm mb-3 flex w-full items-center gap-2 rounded-xl bg-base-200/50 transition focus-within:border-primary focus-within:bg-base-100">
+                <label class="input input-bordered input-sm mb-3 flex w-full items-center gap-2 rounded-xl bg-base-200/50 transition focus-within:border-primary focus-within:bg-base-100 rel-blok">
                     <i class="fas fa-search text-xs opacity-50"></i>
                     <input type="search" id="cari-menu-samping" class="grow" placeholder="Cari menu…"
                            autocomplete="off" aria-label="Cari menu navigasi">
@@ -261,9 +271,9 @@ if ($bebasWilayah) {
                         <ul class="menu p-0 gap-1 text-sm w-full">
                             <?php foreach ($grup['menu'] as $kunci => $m) : ?>
                                 <li>
-                                    <a href="<?= base_url($kunci) ?>"
-                                       class="rounded-xl py-2.5 font-medium transition duration-200 hover:translate-x-0.5 hover:bg-base-200 <?= $kunciAktif === $kunci ? 'active bg-primary text-primary-content shadow-md shadow-primary/20 hover:bg-primary' : '' ?>">
-                                        <i class="fas <?= $m['ikon'] ?> w-5 text-center opacity-75"></i> <?= $m['label'] ?>
+                                    <a href="<?= base_url($kunci) ?>" title="<?= esc($m['label'], 'attr') ?>"
+                                       class="rounded-xl py-2.5 font-medium transition duration-200 hover:translate-x-0.5 hover:bg-base-200 <?= $kunciAktif === $kunci ? 'active bg-primary text-primary-content shadow-md shadow-primary/20 hover:bg-primary shadow-[inset_3px_0_0_#fbbf24]' : '' ?>">
+                                        <i class="fas <?= $m['ikon'] ?> w-5 shrink-0 text-center opacity-75"></i> <span class="rel-teks"><?= $m['label'] ?></span>
                                     </a>
                                 </li>
                             <?php endforeach; ?>
@@ -273,16 +283,16 @@ if ($bebasWilayah) {
                         <div class="collapse collapse-arrow mb-1 rounded-2xl border border-transparent bg-base-200/40 transition-colors hover:border-base-300 hover:bg-base-200/70 <?= $punyaAktif ? 'punya-aktif border-primary/20 bg-primary/5' : '' ?>" data-grup="<?= esc($grup['grup'], 'attr') ?>">
                             <input type="checkbox" class="grup-cek min-h-0" <?= $punyaAktif ? 'checked' : '' ?> aria-label="Buka/tutup grup <?= esc($grup['grup'], 'attr') ?>">
                             <div class="collapse-title flex min-h-0 items-center gap-2 py-2.5 text-xs font-bold tracking-wide <?= $punyaAktif ? 'text-primary' : 'opacity-75' ?>">
-                                <i class="fas <?= $grup['ikonGrup'] ?? 'fa-folder' ?> flex h-7 w-7 items-center justify-center rounded-lg bg-base-100 text-primary shadow-sm"></i>
-                                <span><?= esc($grup['grup']) ?></span>
+                                <i class="fas <?= $grup['ikonGrup'] ?? 'fa-folder' ?> flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-base-100 text-primary shadow-sm"></i>
+                                <span class="rel-teks"><?= esc($grup['grup']) ?></span>
                             </div>
                             <div class="collapse-content px-2">
                                 <ul class="menu w-full gap-1 p-0 text-sm">
                                     <?php foreach ($grup['menu'] as $kunci => $m) : ?>
                                         <li>
-                                            <a href="<?= base_url($kunci) ?>"
-                                               class="rounded-xl py-2 font-medium transition duration-200 hover:translate-x-0.5 hover:bg-base-200 <?= $kunciAktif === $kunci ? 'active bg-primary text-primary-content shadow-md shadow-primary/20 hover:bg-primary' : '' ?>">
-                                                <i class="fas <?= $m['ikon'] ?> w-5 text-center opacity-75"></i> <?= $m['label'] ?>
+                                            <a href="<?= base_url($kunci) ?>" title="<?= esc($m['label'], 'attr') ?>"
+                                               class="rounded-xl py-2 font-medium transition duration-200 hover:translate-x-0.5 hover:bg-base-200 <?= $kunciAktif === $kunci ? 'active bg-primary text-primary-content shadow-md shadow-primary/20 hover:bg-primary shadow-[inset_3px_0_0_#fbbf24]' : '' ?>">
+                                                <i class="fas <?= $m['ikon'] ?> w-5 shrink-0 text-center opacity-75"></i> <span class="rel-teks"><?= $m['label'] ?></span>
                                             </a>
                                         </li>
                                     <?php endforeach; ?>
@@ -293,7 +303,10 @@ if ($bebasWilayah) {
                 <?php endforeach; ?>
             </nav>
             <div class="border-t border-base-200 px-4 py-3">
-                <div class="flex items-center justify-between text-[10px] opacity-50">
+                <button type="button" id="tombol-rel" class="btn btn-ghost btn-xs hidden lg:inline-flex gap-1.5 mb-2" title="Lipat/bentangkan menu samping">
+                    <i class="fas fa-angles-left" id="ikon-rel"></i> <span class="rel-teks">Lipat menu</span>
+                </button>
+                <div class="flex items-center justify-between text-[10px] opacity-50 rel-teks">
                     <span>Data Pemilih PPK</span>
                     <span class="font-semibold">CI4</span>
                 </div>
@@ -375,6 +388,36 @@ $.ajaxSetup({
             segarkanIkon();
         });
     }
+})();
+</script>
+<script>
+// Mode rel ikon sidebar (desktop): tombol di kaki sidebar, pilihan
+// tersimpan per peramban; mengklik ikon grup saat terlipat membentangkannya.
+(function () {
+    var tombol = document.getElementById('tombol-rel');
+    var ikon = document.getElementById('ikon-rel');
+    function segarkan() {
+        var rel = document.documentElement.classList.contains('rel-samping');
+        if (ikon) ikon.className = rel ? 'fas fa-angles-right' : 'fas fa-angles-left';
+        if (tombol) tombol.querySelector('span').textContent = rel ? 'Bentangkan' : 'Lipat menu';
+    }
+    segarkan();
+    if (tombol) {
+        tombol.addEventListener('click', function () {
+            var rel = document.documentElement.classList.toggle('rel-samping');
+            try { localStorage.setItem('samping-rel', rel ? '1' : '0'); } catch (e) {}
+            segarkan();
+        });
+    }
+    document.querySelectorAll('#nav-samping .collapse-title').forEach(function (el) {
+        el.addEventListener('click', function () {
+            if (document.documentElement.classList.contains('rel-samping')) {
+                document.documentElement.classList.remove('rel-samping');
+                try { localStorage.setItem('samping-rel', '0'); } catch (e) {}
+                segarkan();
+            }
+        });
+    });
 })();
 </script>
 <script>
