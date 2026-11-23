@@ -31,6 +31,42 @@
     </div>
 </div>
 
+<div class="card bg-base-100 shadow mb-4">
+    <div class="card-body p-4">
+        <h2 class="card-title text-base"><i class="fas fa-right-to-bracket text-primary"></i> Halaman Masuk</h2>
+        <p class="text-sm opacity-70">Pilih tampilan halaman masuk yang dilihat semua pengguna. Perubahan berlaku seketika, tanpa perlu mengubah berkas apa pun.</p>
+
+        <form method="post" action="<?= base_url('konteks/versi-login') ?>" class="mt-2">
+            <?= csrf_field() ?>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="cursor-pointer">
+                    <input type="radio" name="versi" value="1" class="peer sr-only" <?= $versiLogin === '1' ? 'checked' : '' ?>>
+                    <span class="block rounded-2xl border-2 border-base-300 p-4 transition peer-checked:border-primary peer-checked:bg-primary/5">
+                        <span class="flex items-center justify-between">
+                            <span class="font-bold text-sm">Versi 1 — Klasik</span>
+                            <span class="badge badge-outline badge-sm">panel samping</span>
+                        </span>
+                        <span class="mt-1 block text-xs opacity-60">Tata letak dua kolom: panel informasi gelap di kiri, formulir di kanan.</span>
+                    </span>
+                </label>
+                <label class="cursor-pointer">
+                    <input type="radio" name="versi" value="2" class="peer sr-only" <?= $versiLogin === '2' ? 'checked' : '' ?>>
+                    <span class="block rounded-2xl border-2 border-base-300 p-4 transition peer-checked:border-primary peer-checked:bg-primary/5">
+                        <span class="flex items-center justify-between">
+                            <span class="font-bold text-sm">Versi 2 — Kartu Tengah</span>
+                            <span class="badge badge-primary badge-sm">baru</span>
+                        </span>
+                        <span class="mt-1 block text-xs opacity-60">Satu kartu di tengah layar di atas latar gradasi penuh, aksen emas KPU.</span>
+                    </span>
+                </label>
+            </div>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save"></i> SIMPAN TAMPILAN</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card bg-base-100 shadow">
     <div class="card-body p-4">
         <h3 class="font-bold text-sm mb-2">Perbedaan antarrezim (dari formulir resmi)</h3>

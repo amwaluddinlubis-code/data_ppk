@@ -40,7 +40,26 @@ class Konteks extends BaseController
             'tanggal' => KonteksLib::tanggalPemungutan() ?? '',
             'daftarJenis' => KonteksLib::JENIS,
             'legenda' => $legenda,
+            'versiLogin' => \App\Libraries\Pengaturan::versiLogin(),
         ]);
+    }
+
+    /** Admin kabupaten memilih tampilan halaman masuk (versi 1 atau 2). */
+    public function simpanVersiLogin()
+    {
+        if (session()->get('pengguna_peran') !== 'admin') {
+            return redirect()->to('/')->with('galat', 'Hanya admin kabupaten yang dapat mengubah tampilan halaman masuk.');
+        }
+
+        $versi = (string) $this->request->getPost('versi');
+        if (! in_array($versi, ['1', '2'], true)) {
+            return redirect()->to('konteks')->with('galat', 'Versi tampilan halaman masuk tidak sah.');
+        }
+
+        db_connect()->table('pengaturan')->replace(['kunci' => 'versi_login', 'nilai' => $versi]);
+
+        return redirect()->to('konteks')
+            ->with('sukses', 'Tampilan halaman masuk kini memakai versi ' . $versi . '. Berlaku seketika untuk semua pengguna.');
     }
 
     public function simpan()

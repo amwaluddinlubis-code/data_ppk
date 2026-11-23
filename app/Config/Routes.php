@@ -109,6 +109,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     // Konteks penyelenggaraan (Fase A) — admin
     $routes->get('konteks', 'Konteks::index');
     $routes->post('konteks/simpan', 'Konteks::simpan');
+    $routes->post('konteks/versi-login', 'Konteks::simpanVersiLogin');
 
     // PDPB berkelanjutan (Fase B)
     $routes->get('pdpb', 'Pdpb::index');

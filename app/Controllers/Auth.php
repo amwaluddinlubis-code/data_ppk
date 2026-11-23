@@ -41,7 +41,11 @@ class Auth extends BaseController
             return redirect()->to('/');
         }
 
-        return view('auth/login', $this->dataHalaman('Masuk — Aplikasi Pemilih PPK'));
+        // Tampilan halaman masuk dipilih admin kabupaten lewat
+        // pengaturan versi_login (Konteks > Halaman Masuk).
+        $tampilan = \App\Libraries\Pengaturan::versiLogin() === '2' ? 'auth/login_v2' : 'auth/login';
+
+        return view($tampilan, $this->dataHalaman('Masuk — Aplikasi Pemilih PPK'));
     }
 
     public function masuk()
