@@ -57,6 +57,27 @@ final class Keterangan
         '8' => 'Salah Penempatan TPS',
     ];
 
+    /** Kelas lencana (DaisyUI) satu kode: warna mengikuti kelompok kodenya. */
+    public static function kelasLencana(string $kode): string
+    {
+        return match (true) {
+            $kode === '0', $kode === 'U' => 'badge-success',
+            $kode === 'B' => 'badge-info',
+            $kode === '8' => 'badge-warning',
+            self::isTms($kode) => 'badge-error',
+            default => 'badge-ghost',
+        };
+    }
+
+    /** Lencana HTML siap pakai untuk sel tabel: kode berwarna, nama lengkap sebagai judul. */
+    public static function lencana(string $kode, ?string $jenis = null): string
+    {
+        $kode = trim($kode);
+
+        return '<span class="badge badge-sm font-semibold ' . self::kelasLencana($kode)
+            . '" title="' . esc(self::nama($kode, $jenis), 'attr') . '">' . esc($kode) . '</span>';
+    }
+
     /** Label mentah satu kode menurut rezim (bawaan: konteks aktif). */
     private static function mentah(string $kode, ?string $jenis): string
     {

@@ -60,7 +60,7 @@ $jendela = range(max(1, $halaman - 2), min($totalHal, $halaman + 2));
                     <td><?= esc($r['NAMA']) ?></td>
                     <td><?= esc($r['TGLLHR']) ?></td>
                     <td><?= esc($r['LU']) ?></td>
-                    <td><?= esc($r['KET']) ?></td>
+                    <td><?= \App\Libraries\Keterangan::lencana((string) $r['KET']) ?></td>
                     <td><?= esc($r['JENIS_KELAMIN']) ?></td>
                 </tr>
             <?php endforeach; ?>

@@ -32,7 +32,7 @@ $paginasi = ['urlTabel' => $urlTabel, 'target' => $target, 'saring' => $saring, 
                     <td><?= esc($r['NAMA']) ?></td>
                     <td><?= esc($r['TGLLHR']) ?></td>
                     <td><?= esc($r['LP']) ?></td>
-                    <td><?= esc($r['KET']) ?></td>
+                    <td><?= \App\Libraries\Keterangan::lencana((string) $r['KET']) ?></td>
                 </tr>
             <?php endforeach; ?>
         </tbody>

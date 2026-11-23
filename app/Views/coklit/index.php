@@ -63,7 +63,7 @@
                             <td><?= esc($r['NAMA']) ?></td>
                             <td><?= esc($r['DESA']) ?></td>
                             <td><?= esc($r['TPS']) ?></td>
-                            <td><span class="badge badge-ghost badge-sm"><?= esc($r['KET']) ?></span></td>
+                            <td><?= \App\Libraries\Keterangan::lencana((string) $r['KET']) ?></td>
                             <td><?= esc($r['JENIS_KELAMIN']) ?></td>
                             <td class="text-right whitespace-nowrap">
                                 <a href="<?= base_url('coklit/edit/' . $r['ID']) ?>" class="btn btn-primary btn-xs"><i class="fas fa-edit"></i> UBAH</a>

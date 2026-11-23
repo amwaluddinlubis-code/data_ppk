@@ -69,4 +69,14 @@ final class KeteranganTest extends CIUnitTestCase
         $this->assertSame("'0','U','B'", Keterangan::sqlMs());
         $this->assertSame("'1','2','3','4','5','6','7','8'", Keterangan::sqlTms());
     }
+public function testKelasLencanaMengikutiKelompokKode(): void
+    {
+        $this->assertSame('badge-success', Keterangan::kelasLencana('0'));
+        $this->assertSame('badge-success', Keterangan::kelasLencana('U'));
+        $this->assertSame('badge-info', Keterangan::kelasLencana('B'));
+        $this->assertSame('badge-warning', Keterangan::kelasLencana('8'));
+        $this->assertSame('badge-error', Keterangan::kelasLencana('1'));
+        $this->assertSame('badge-error', Keterangan::kelasLencana('5'));
+        $this->assertSame('badge-ghost', Keterangan::kelasLencana('X'));
+    }
 }
